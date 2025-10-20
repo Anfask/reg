@@ -85,7 +85,7 @@ export default function LandingPage() {
                         </svg>
                       </div>
                       <div>
-                        <p className="text-white font-semibold text-lg">@Poonch, J&K</p>
+                        <p className="text-white font-semibold text-lg">@Poonch</p>
                         <p className="text-emerald-200 text-sm">Jammu & Kashmir Region</p>
                       </div>
                     </div>
