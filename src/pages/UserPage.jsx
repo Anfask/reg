@@ -39,7 +39,7 @@ export default function UserPage() {
         const message = `Welcome ${name} to the Ahibba Summit 6.0. Your bed space is ${bedspace}.`;
         const utterance = new SpeechSynthesisUtterance(message);
 
-        utterance.rate = 0.7;
+        utterance.rate = 0.8;
         utterance.pitch = 0.9;
         utterance.volume = 1;
 
