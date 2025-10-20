@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import AdminLogin from './pages/AdminLogin';
 import Dashboard from './pages/Dashboard';
 import UserPage from './pages/UserPage';
+import LandingPage from './pages/LandingPage';
 import NotFoundPage from './pages/NotFoundPage';
 
 function ProtectedRoute({ children }) {
@@ -28,7 +29,13 @@ function App() {
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/" element={<UserPage />} />
+        {/* Landing page as the new home */}
+        <Route path="/" element={<LandingPage />} />
+        
+        {/* Registration page */}
+        <Route path="/register" element={<UserPage />} />
+        
+        {/* Admin routes */}
         <Route path="/admin" element={<AdminLogin />} />
         <Route
           path="/dashboard"
@@ -38,6 +45,11 @@ function App() {
             </ProtectedRoute>
           }
         />
+        
+        {/* Redirect old user page URL to new register URL */}
+        <Route path="/user" element={<Navigate to="/register" replace />} />
+        
+        {/* 404 page */}
         <Route path="*" element={<NotFoundPage />} />
       </Routes>
     </BrowserRouter>
