@@ -29,275 +29,254 @@ export default function UserPage() {
   const [availableRooms, setAvailableRooms] = useState([])
   const [selectedRoom, setSelectedRoom] = useState("")
   const [isFetchingRooms, setIsFetchingRooms] = useState(false)
-  const [roomsStatus, setRoomsStatus] = useState("") // "loading", "available", "full", "error"
+  const [roomsStatus, setRoomsStatus] = useState("")
 
   const speakWelcomeMessage = (name, bedspace) => {
-  try {
-    if ('speechSynthesis' in window) {
-      window.speechSynthesis.cancel();
+    try {
+      if ('speechSynthesis' in window) {
+        window.speechSynthesis.cancel();
 
-      const message = `Welcome ${name} to the Ahibba Summit 6.0. Your bed space is ${bedspace}.`;
-      const utterance = new SpeechSynthesisUtterance(message);
+        const message = `Welcome ${name} to the Ahibba Summit 6.0. Your bed space is ${bedspace}.`;
+        const utterance = new SpeechSynthesisUtterance(message);
 
-      // Slow speaking parameters for Indian male voice
-      utterance.rate = 0.8;    // Very slow for clear pronunciation
-      utterance.pitch = 0.9;   // Slightly lower for male voice
-      utterance.volume = 1;
+        utterance.rate = 0.7;
+        utterance.pitch = 0.9;
+        utterance.volume = 1;
 
-      // Add pauses between words for better clarity
-      const setVoice = () => {
-        const voices = window.speechSynthesis.getVoices();
+        const setVoice = () => {
+          const voices = window.speechSynthesis.getVoices();
+          const indianVoice = voices.find(v => v.lang.includes('en-IN')) || voices[0];
+          if (indianVoice) utterance.voice = indianVoice;
+          window.speechSynthesis.speak(utterance);
+        };
 
-        // Try to find an Indian English male voice
-        const indianMaleVoice =
-          voices.find(v => 
-            v.lang.toLowerCase().includes('en-in') && 
-            (v.name.toLowerCase().includes('male') ||
-             v.name.toLowerCase().includes('deep') ||
-             v.name.toLowerCase().includes('david') ||
-             v.name.toLowerCase().includes('india'))
-          ) ||
-          voices.find(v => v.lang.toLowerCase().includes('en-in')) || // fallback to any Indian English
-          voices.find(v => v.lang.toLowerCase().includes('en-gb') && v.name.toLowerCase().includes('male')) || // British male
-          voices.find(v => v.lang.toLowerCase().includes('en-us') && v.name.toLowerCase().includes('male')) || // US male
-          voices.find(v => v.lang.toLowerCase().includes('en-gb')) || // fallback to British
-          voices.find(v => v.lang.toLowerCase().includes('en-us')) || // fallback to US
-          voices[0]; // final fallback
-
-        if (indianMaleVoice) {
-          utterance.voice = indianMaleVoice;
-          console.log('Using Indian male voice:', indianMaleVoice.name);
+        if (window.speechSynthesis.getVoices().length === 0) {
+          window.speechSynthesis.onvoiceschanged = setVoice;
         } else {
-          console.log('No Indian male voice found, using default voice');
+          setVoice();
         }
-
-        // Speak slowly and clearly
-        window.speechSynthesis.speak(utterance);
-      };
-
-      // Some browsers (like Chrome) load voices asynchronously
-      if (window.speechSynthesis.getVoices().length === 0) {
-        window.speechSynthesis.onvoiceschanged = setVoice;
-      } else {
-        setVoice();
       }
+    } catch (error) {
+      console.error("Error with text-to-speech:", error);
     }
-  } catch (error) {
-    console.error("Error with text-to-speech:", error);
   }
-}
 
-
-  // Fetch available rooms for selected zone
+  // Fixed room fetching function
   const fetchAvailableRooms = async (zone) => {
+    if (!zone) return [];
+    
     setIsFetchingRooms(true)
     setRoomsStatus("loading")
     
     try {
+      // Get all rooms first
+      const roomsSnapshot = await getDocs(collection(db, "rooms"));
+      const allRooms = roomsSnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+
       // Get allocations for this zone
       const allocationQuery = query(
         collection(db, "bedAllocations"),
         where("zone", "==", zone)
-      )
-      const allocationSnapshot = await getDocs(allocationQuery)
+      );
+      const allocationSnapshot = await getDocs(allocationQuery);
       
-      const availableRoomsList = []
+      const availableRoomsList = [];
       
       for (const allocDoc of allocationSnapshot.docs) {
-        const allocation = allocDoc.data()
+        const allocation = allocDoc.data();
         
-        // Get room details
-        const roomQuery = query(
-          collection(db, "rooms"),
-          where("__name__", "==", allocation.roomId)
-        )
-        const roomSnapshot = await getDocs(roomQuery)
+        // Find the room by ID
+        const room = allRooms.find(r => r.id === allocation.roomId);
         
-        if (!roomSnapshot.empty) {
-          const room = roomSnapshot.docs[0].data()
-          const roomId = roomSnapshot.docs[0].id
-          
-          // Count how many attendees are already assigned to this room in this zone
+        if (room) {
+          // Count attendees for this room and zone
           const attendeeQuery = query(
             collection(db, "ahibba"),
             where("zone", "==", zone),
             where("bedspace", "==", room.name)
-          )
-          const attendeeSnapshot = await getDocs(attendeeQuery)
-          const occupiedBeds = attendeeSnapshot.size
-          const availableBeds = allocation.bedsAllocated - occupiedBeds
+          );
+          const attendeeSnapshot = await getDocs(attendeeQuery);
+          const occupiedBeds = attendeeSnapshot.size;
+          const availableBeds = allocation.bedsAllocated - occupiedBeds;
           
           if (availableBeds > 0) {
             availableRoomsList.push({
-              id: roomId,
+              id: room.id,
               name: room.name,
               availableBeds: availableBeds,
               totalAllocated: allocation.bedsAllocated,
               occupiedBeds: occupiedBeds
-            })
+            });
           }
         }
       }
       
-      setAvailableRooms(availableRoomsList)
+      setAvailableRooms(availableRoomsList);
       
-      // Update rooms status
       if (availableRoomsList.length > 0) {
-        setRoomsStatus("available")
+        setRoomsStatus("available");
+        if (!selectedRoom) {
+          setSelectedRoom(availableRoomsList[0].id);
+        }
       } else {
-        setRoomsStatus("full")
+        setRoomsStatus("full");
       }
       
-      // Auto-select the first available room if none selected
-      if (availableRoomsList.length > 0 && !selectedRoom) {
-        setSelectedRoom(availableRoomsList[0].id)
-      }
-      
-      return availableRoomsList
+      return availableRoomsList;
     } catch (error) {
-      console.error("Error fetching available rooms:", error)
-      setAvailableRooms([])
-      setRoomsStatus("error")
-      return []
+      console.error("Error fetching available rooms:", error);
+      setAvailableRooms([]);
+      
+      if (error.code === 'permission-denied') {
+        setRoomsStatus("permission-error");
+      } else if (error.code === 'unavailable') {
+        setRoomsStatus("network-error");
+      } else {
+        setRoomsStatus("error");
+      }
+      
+      return [];
     } finally {
-      setIsFetchingRooms(false)
+      setIsFetchingRooms(false);
     }
   }
 
   const isValidMobileNumber = (mobile) => {
-    if (!mobile || mobile.trim() === "") return false
-    const cleanMobile = mobile.trim()
-    if (!/^\d+$/.test(cleanMobile)) return false
-    return cleanMobile.length === 10
+    if (!mobile || mobile.trim() === "") return false;
+    const cleanMobile = mobile.trim();
+    if (!/^\d+$/.test(cleanMobile)) return false;
+    return cleanMobile.length === 10;
   }
 
-  // Check if mobile number already exists
   const checkMobileExists = async (mobile) => {
     try {
       const mobileQuery = query(
         collection(db, "ahibba"),
         where("mobile", "==", mobile.trim())
-      )
-      const snapshot = await getDocs(mobileQuery)
-      return !snapshot.empty
+      );
+      const snapshot = await getDocs(mobileQuery);
+      return !snapshot.empty;
     } catch (error) {
-      console.error("Error checking mobile number:", error)
-      return false
+      console.error("Error checking mobile number:", error);
+      return false;
     }
   }
 
   const validateForm = async () => {
-    const newErrors = {}
+    const newErrors = {};
 
     if (!formData.name.trim()) {
-      newErrors.name = "Please enter your name"
+      newErrors.name = "Please enter your name";
     } else if (formData.name.trim().length < 2) {
-      newErrors.name = "Name must be at least 2 characters long"
+      newErrors.name = "Name must be at least 2 characters long";
     }
 
     if (!formData.mobile.trim()) {
-      newErrors.mobile = "Please enter your mobile number"
+      newErrors.mobile = "Please enter your mobile number";
     } else if (!isValidMobileNumber(formData.mobile)) {
-      newErrors.mobile = "Please enter a valid 10-digit mobile number"
+      newErrors.mobile = "Please enter a valid 10-digit mobile number";
     } else {
-      const mobileExists = await checkMobileExists(formData.mobile)
+      const mobileExists = await checkMobileExists(formData.mobile);
       if (mobileExists) {
-        newErrors.mobile = "This mobile number is already registered"
+        newErrors.mobile = "This mobile number is already registered";
       }
     }
 
     if (!formData.designation.trim()) {
-      newErrors.designation = "Please enter your designation"
+      newErrors.designation = "Please enter your designation";
     }
 
     if (!formData.zone) {
-      newErrors.zone = "Please select your zone"
-    } else if (availableRooms.length === 0) {
-      newErrors.zone = "No available bed spaces in this zone. Please contact administrator."
+      newErrors.zone = "Please select your zone";
+    } else if (availableRooms.length === 0 && roomsStatus === "full") {
+      newErrors.zone = "No available bed spaces in this zone. Please contact administrator.";
     }
 
     if (!selectedRoom) {
-      newErrors.room = "Please select a room"
+      newErrors.room = "Please select a room";
     }
 
-    setErrors(newErrors)
-    return Object.keys(newErrors).length === 0
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
   }
 
   const handleInputChange = (e) => {
-    const { name, value } = e.target
+    const { name, value } = e.target;
     setFormData(prev => ({
       ...prev,
       [name]: value
-    }))
+    }));
     if (errors[name]) {
       setErrors(prev => ({
         ...prev,
         [name]: ""
-      }))
+      }));
     }
   }
 
   const handleZoneChange = async (e) => {
-    const zone = e.target.value
+    const zone = e.target.value;
     setFormData(prev => ({
       ...prev,
       zone: zone
-    }))
-    setSelectedRoom("")
-    setAvailableRooms([])
-    setRoomsStatus("")
+    }));
+    setSelectedRoom("");
+    setAvailableRooms([]);
+    setRoomsStatus("");
     
     if (errors.zone) {
       setErrors(prev => ({
         ...prev,
         zone: ""
-      }))
+      }));
     }
 
     if (zone) {
-      await fetchAvailableRooms(zone)
+      await fetchAvailableRooms(zone);
     }
   }
 
   const handleRoomChange = (e) => {
-    const roomId = e.target.value
-    setSelectedRoom(roomId)
+    const roomId = e.target.value;
+    setSelectedRoom(roomId);
     if (errors.room) {
       setErrors(prev => ({
         ...prev,
-        room: ""
-      }))
+        [name]: ""
+      }));
     }
   }
 
   const handleSubmit = async (e) => {
-    e.preventDefault()
+    e.preventDefault();
     
-    const isValid = await validateForm()
+    const isValid = await validateForm();
     if (!isValid) {
-      return
+      return;
     }
 
-    setLoading(true)
+    setLoading(true);
 
     try {
-      const selectedRoomInfo = availableRooms.find(room => room.id === selectedRoom)
+      const selectedRoomInfo = availableRooms.find(room => room.id === selectedRoom);
       
       if (!selectedRoomInfo) {
-        setErrors({ general: "Selected room not available. Please try again." })
-        setLoading(false)
-        return
+        setErrors({ general: "Selected room not available. Please try again." });
+        setLoading(false);
+        return;
       }
 
-      // Check room availability again before submitting
-      const updatedRooms = await fetchAvailableRooms(formData.zone)
-      const currentRoom = updatedRooms.find(room => room.id === selectedRoom)
+      // Final availability check
+      const updatedRooms = await fetchAvailableRooms(formData.zone);
+      const currentRoom = updatedRooms.find(room => room.id === selectedRoom);
       
       if (!currentRoom || currentRoom.availableBeds <= 0) {
-        setErrors({ general: "Sorry, this room is no longer available. Please select another room." })
-        setLoading(false)
-        return
+        setErrors({ general: "Sorry, this room is no longer available. Please select another room." });
+        setLoading(false);
+        return;
       }
 
       const userRef = await addDoc(collection(db, "ahibba"), {
@@ -312,7 +291,7 @@ export default function UserPage() {
         isSubUser: false,
         parentUserId: "",
         checkinTime: new Date()
-      })
+      });
 
       setUserData({
         id: userRef.id,
@@ -320,47 +299,157 @@ export default function UserPage() {
         bedspace: selectedRoomInfo.name,
         roomId: selectedRoom,
         checkinTime: new Date()
-      })
+      });
 
-      speakWelcomeMessage(formData.name, selectedRoomInfo.name)
-      setHasSubmitted(true)
+      speakWelcomeMessage(formData.name, selectedRoomInfo.name);
+      setHasSubmitted(true);
     } catch (error) {
-      console.error("Error submitting registration:", error)
-      setErrors({ general: "Failed to submit registration. Please try again." })
+      console.error("Error submitting registration:", error);
+      
+      if (error.code === 'permission-denied') {
+        setErrors({ general: "Registration failed due to security restrictions. Please contact administrator." });
+      } else if (error.code === 'unavailable') {
+        setErrors({ general: "Network error. Please check your internet connection and try again." });
+      } else {
+        setErrors({ general: "Registration failed. Please try again or contact support." });
+      }
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
   }
 
   const handleRefresh = () => {
-    setFormData({ name: "", mobile: "", designation: "", zone: "" })
-    setUserData(null)
-    setHasSubmitted(false)
-    setErrors({})
-    setAvailableRooms([])
-    setSelectedRoom("")
-    setRoomsStatus("")
-    setIsFetchingRooms(false)
+    setFormData({ name: "", mobile: "", designation: "", zone: "" });
+    setUserData(null);
+    setHasSubmitted(false);
+    setErrors({});
+    setAvailableRooms([]);
+    setSelectedRoom("");
+    setRoomsStatus("");
+    setIsFetchingRooms(false);
   }
 
   const formatTime = (timestamp) => {
-    if (!timestamp) return ""
-    const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp)
+    if (!timestamp) return "";
+    const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
     return date.toLocaleTimeString('en-IN', {
       hour: '2-digit',
       minute: '2-digit',
       hour12: true
-    })
+    });
   }
 
   const formatDate = (timestamp) => {
-    if (!timestamp) return ""
-    const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp)
+    if (!timestamp) return "";
+    const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
     return date.toLocaleDateString('en-IN', {
       day: '2-digit',
       month: 'short',
       year: 'numeric'
-    })
+    });
+  }
+
+  const renderRoomStatusMessage = () => {
+    switch (roomsStatus) {
+      case "loading":
+        return (
+          <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+            <p className="text-sm text-blue-700 text-center">
+              <div className="animate-spin rounded-full h-4 w-4 border-2 border-blue-500 border-t-transparent inline-block mr-2"></div>
+              Loading available rooms for {formData.zone}...
+            </p>
+          </div>
+        );
+      
+      case "available":
+        return (
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Select Room <span className="text-red-500">*</span>
+            </label>
+            <select
+              value={selectedRoom}
+              onChange={handleRoomChange}
+              className={`w-full px-4 py-2 rounded-lg border focus:ring-2 focus:ring-blue-200 transition-all ${
+                errors.room ? "border-red-300 bg-red-50" : "border-gray-300"
+              }`}
+              disabled={loading}
+            >
+              <option value="">-- Select Room --</option>
+              {availableRooms.map(room => (
+                <option key={room.id} value={room.id}>
+                  {room.name} ({room.availableBeds} bed{room.availableBeds !== 1 ? 's' : ''} available)
+                </option>
+              ))}
+            </select>
+            {errors.room && (
+              <p className="text-sm text-red-600 mt-1">{errors.room}</p>
+            )}
+            
+            <div className="mt-2 p-3 bg-green-50 rounded-lg border border-green-200">
+              <p className="text-xs text-green-700 font-medium mb-1">Available Rooms in {formData.zone}:</p>
+              <div className="space-y-1">
+                {availableRooms.map(room => (
+                  <div key={room.id} className="flex justify-between text-xs">
+                    <span className={selectedRoom === room.id ? "font-bold text-green-800" : "text-green-700"}>
+                      {room.name}
+                    </span>
+                    <span className="text-green-600">
+                      {room.availableBeds} / {room.totalAllocated} available
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        );
+      
+      case "full":
+        return (
+          <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
+            <div className="flex items-center">
+              <svg className="w-5 h-5 text-red-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <p className="text-sm text-red-700">
+                <strong>All rooms are currently full for {formData.zone}.</strong><br />
+                Please contact the administrator for assistance.
+              </p>
+            </div>
+          </div>
+        );
+      
+      case "permission-error":
+        return (
+          <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+            <p className="text-sm text-yellow-700">
+              <strong>Access restricted.</strong><br />
+              Please contact administrator to resolve permission issues.
+            </p>
+          </div>
+        );
+      
+      case "network-error":
+        return (
+          <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+            <p className="text-sm text-yellow-700">
+              <strong>Network connection issue.</strong><br />
+              Please check your internet connection and try again.
+            </p>
+          </div>
+        );
+      
+      case "error":
+      default:
+        return (
+          <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+            <p className="text-sm text-yellow-700">
+              <strong>Error loading rooms for {formData.zone}.</strong><br />
+              Please try again or contact administrator.
+            </p>
+          </div>
+        );
+    }
   }
 
   return (
@@ -484,83 +573,9 @@ export default function UserPage() {
                 )}
               </div>
 
-              {/* Room Selection Section */}
               {formData.zone && (
                 <div>
-                  {isFetchingRooms && (
-                    <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg mb-4">
-                      <p className="text-sm text-blue-700 text-center">
-                        <div className="animate-spin rounded-full h-4 w-4 border-2 border-blue-500 border-t-transparent inline-block mr-2"></div>
-                        Loading available rooms for {formData.zone}...
-                      </p>
-                    </div>
-                  )}
-
-                  {!isFetchingRooms && roomsStatus === "available" && availableRooms.length > 0 && (
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Select Room <span className="text-red-500">*</span>
-                      </label>
-                      <select
-                        value={selectedRoom}
-                        onChange={handleRoomChange}
-                        className={`w-full px-4 py-2 rounded-lg border focus:ring-2 focus:ring-blue-200 transition-all ${
-                          errors.room ? "border-red-300 bg-red-50" : "border-gray-300"
-                        }`}
-                        disabled={loading}
-                      >
-                        <option value="">-- Select Room --</option>
-                        {availableRooms.map(room => (
-                          <option key={room.id} value={room.id}>
-                            {room.name} ({room.availableBeds} bed{room.availableBeds !== 1 ? 's' : ''} available)
-                          </option>
-                        ))}
-                      </select>
-                      {errors.room && (
-                        <p className="text-sm text-red-600 mt-1">{errors.room}</p>
-                      )}
-                      
-                      {/* Room availability info */}
-                      <div className="mt-2 p-3 bg-green-50 rounded-lg border border-green-200">
-                        <p className="text-xs text-green-700 font-medium mb-1">Available Rooms in {formData.zone}:</p>
-                        <div className="space-y-1">
-                          {availableRooms.map(room => (
-                            <div key={room.id} className="flex justify-between text-xs">
-                              <span className={selectedRoom === room.id ? "font-bold text-green-800" : "text-green-700"}>
-                                {room.name}
-                              </span>
-                              <span className="text-green-600">
-                                {room.availableBeds} / {room.totalAllocated} available
-                              </span>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  {!isFetchingRooms && roomsStatus === "full" && (
-                    <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
-                      <div className="flex items-center">
-                        <svg className="w-5 h-5 text-red-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
-                        <p className="text-sm text-red-700">
-                          <strong>All rooms are currently full for {formData.zone}.</strong><br />
-                          Please contact the administrator for assistance.
-                        </p>
-                      </div>
-                    </div>
-                  )}
-
-                  {!isFetchingRooms && roomsStatus === "error" && (
-                    <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-                      <p className="text-sm text-yellow-700">
-                        <strong>Error loading rooms for {formData.zone}.</strong><br />
-                        Please try again or contact administrator.
-                      </p>
-                    </div>
-                  )}
+                  {renderRoomStatusMessage()}
                 </div>
               )}
 
@@ -655,9 +670,9 @@ export default function UserPage() {
         className="mt-8 text-center"
       >
         <p className="text-sm text-white/80">
-          © 2025 YES INDIA FOUNDATION | Ahibba Summit 2025
+          © 2025 YES INDIA FOUNDATION | Powered by Cyberduce Technologies
         </p>
       </motion.div>
     </div>
-  )
+  );
 }
