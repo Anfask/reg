@@ -10,6 +10,7 @@ export default function CertificatePage() {
   const [userData, setUserData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
+  // eslint-disable-next-line no-unused-vars
   const [searchPerformed, setSearchPerformed] = useState(false);
   const [downloading, setDownloading] = useState(false);
   const certificateRef = useRef(null);
