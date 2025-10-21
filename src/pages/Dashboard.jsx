@@ -39,6 +39,7 @@ const ZONES = [
   "Surankote",
   "Rajouri",
   "Jammu",
+  "Srinagar",
   "North East",
   "South",
   "Rajasthan",
