@@ -6,6 +6,7 @@ import Dashboard from './pages/Dashboard';
 import UserPage from './pages/UserPage';
 import LandingPage from './pages/LandingPage';
 import NotFoundPage from './pages/NotFoundPage';
+import CertificatePage from './pages/Certificate';
 
 function ProtectedRoute({ children }) {
   const [user, setUser] = useState(null);
@@ -34,6 +35,8 @@ function App() {
         
         {/* Registration page */}
         <Route path="/register" element={<UserPage />} />
+        {/* Certificate page */}
+        <Route path="/certificate" element={<CertificatePage />} />
         
         {/* Admin routes */}
         <Route path="/admin" element={<AdminLogin />} />
