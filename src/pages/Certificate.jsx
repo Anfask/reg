@@ -10,7 +10,6 @@ export default function CertificatePage() {
   const [userData, setUserData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
-  // eslint-disable-next-line no-unused-vars
   const [searchPerformed, setSearchPerformed] = useState(false);
   const [downloading, setDownloading] = useState(false);
   const certificateRef = useRef(null);
@@ -223,66 +222,89 @@ export default function CertificatePage() {
           initial={{ scale: 0.8, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
           transition={{ delay: 0.3 }}
-          className="w-full max-w-4xl"
+          className="w-full max-w-5xl"
         >
-          <div ref={certificateRef} className="bg-white rounded-lg shadow-2xl p-12 relative overflow-hidden">
-            {/* Certificate Border */}
-            <div className="absolute inset-0 border-8 border-double border-purple-800 m-4 pointer-events-none"></div>
+          <div ref={certificateRef} className="bg-gradient-to-br from-amber-50 to-orange-50 shadow-2xl p-20 relative overflow-hidden" style={{aspectRatio: '16/11'}}>
+            {/* Premium Decorative Border */}
+            <div className="absolute inset-0 border-8 border-double border-amber-700 m-4 pointer-events-none"></div>
+            <div className="absolute inset-0 border-2 border-amber-500 m-6 pointer-events-none"></div>
 
-            {/* Decorative corners */}
-            <div className="absolute top-6 left-6 w-12 h-12 border-t-4 border-l-4 border-purple-600"></div>
-            <div className="absolute top-6 right-6 w-12 h-12 border-t-4 border-r-4 border-purple-600"></div>
-            <div className="absolute bottom-6 left-6 w-12 h-12 border-b-4 border-l-4 border-purple-600"></div>
-            <div className="absolute bottom-6 right-6 w-12 h-12 border-b-4 border-r-4 border-purple-600"></div>
+            {/* Decorative Ornaments */}
+            <div className="absolute top-6 left-6 w-12 h-12 border-t-4 border-l-4 border-amber-700"></div>
+            <div className="absolute top-6 right-6 w-12 h-12 border-t-4 border-r-4 border-amber-700"></div>
+            <div className="absolute bottom-6 left-6 w-12 h-12 border-b-4 border-l-4 border-amber-700"></div>
+            <div className="absolute bottom-6 right-6 w-12 h-12 border-b-4 border-r-4 border-amber-700"></div>
 
-            <div className="relative z-10 text-center space-y-8">
-              {/* Header */}
-              <div className="space-y-2">
-                <h1 className="text-5xl font-bold text-purple-800">Certificate of Participation</h1>
-                <p className="text-lg text-purple-600 font-semibold">Ahibba Summit 6.0</p>
+            {/* Main Content */}
+            <div className="relative z-10 h-full flex flex-col">
+              {/* Header Section with Logos */}
+              <div className="flex items-start justify-between mb-6">
+                {/* YES Logo - Left */}
+                <div className="w-20 h-20 flex-shrink-0">
+                  <img src="logo.png" alt="YES India Logo" className="w-full h-full object-contain" />
+                </div>
+
+                {/* Title - Center */}
+                <div className="flex-1 text-center px-6">
+                  <h1 className="text-5xl font-bold text-amber-900" style={{fontFamily: 'Georgia, serif', letterSpacing: '1px'}}>
+                    Certificate of Participation
+                  </h1>
+                  <div className="w-40 h-1 bg-gradient-to-r from-amber-600 via-yellow-500 to-amber-600 mx-auto mt-3"></div>
+                </div>
               </div>
-
-              {/* Certificate text */}
-              <div className="space-y-4">
-                <p className="text-gray-700 text-lg">This is proudly presented to</p>
-                <h2 className="text-4xl font-bold text-purple-900 border-b-2 border-purple-800 pb-2 inline-block min-w-96">
-                  {userData.name}
-                </h2>
-                <p className="text-gray-700 text-lg">For active participation in</p>
-                <p className="text-xl font-semibold text-purple-800">
-                  Ahibba Summit 2025<br/>
-                  Youth Leadership & Empowerment Conference
-                </p>
-              </div>
-
-              {/* Details */}
-              <div className="space-y-3 bg-purple-50 p-6 rounded-lg border border-purple-200">
-                <div className="flex justify-around text-sm">
-                  <div>
-                    <p className="text-gray-600 font-medium">Designation</p>
-                    <p className="text-gray-800 font-semibold">{userData.designation}</p>
-                  </div>
-                  <div>
-                    <p className="text-gray-600 font-medium">Zone</p>
-                    <p className="text-gray-800 font-semibold">{userData.zone}</p>
-                  </div>
-                  <div>
-                    <p className="text-gray-600 font-medium">Event Date</p>
-                    <p className="text-gray-800 font-semibold">25-26 Oct 2025</p>
-                  </div>
+              {/* Main Certificate Text */}
+              <div className="flex-1 flex flex-col justify-center">
+                <div className="bg-amber/600 p-8 border-2  text-center">
+                  <p className="text-gray-800 leading-relaxed text-lg font-serif mb-4">
+                    This certificate is proudly presented to
+                  </p>
+                  <h2 className="text-4xl font-bold text-purple-900 border-b-4 border-amber-600 pb-3 mb-4 inline-block min-w-96"
+                      style={{fontFamily: 'Georgia, serif'}}>
+                    {userData.name}
+                  </h2>
+                  <p className="text-gray-800 leading-relaxed text-base mb-4 font-serif">
+                    Serving as a <span className="font-bold text-amber-900">{userData.designation}</span> from <span className="font-bold text-amber-900">{userData.zone}</span>, in recognition of his active participation in the Ahibba Summit 6.0 held on 25th-26th October 2025.
+                  </p>
+                  <p className="text-gray-700 leading-relaxed text-sm italic font-serif text-justify">
+                    Your sincere involvement, enthusiasm, and valuable contribution during the program are truly appreciated. Your participation reflected great dedication towards continuous learning and professional excellence.
+                  </p>
                 </div>
               </div>
 
-              {/* Footer */}
-              <div className="pt-8 space-y-2">
-                <p className="text-gray-700 font-semibold">Issued by</p>
-                <p className="text-2xl font-bold text-purple-800">YES INDIA Foundation</p>
-                <p className="text-sm text-gray-600">
-                  Certificate No: {userData.id.substring(0, 12).toUpperCase()}
-                </p>
-                <p className="text-xs text-gray-500 mt-4">
-                  {new Date().toLocaleDateString('en-IN', { year: 'numeric', month: 'long', day: 'numeric' })}
-                </p>
+              {/* Signature Section */}
+              <div className="flex justify-between items-end mt-8">
+                {/* Program Coordinator - Left */}
+                <div className="text-center w-32">
+                  <div className="h-16 mb-2 flex items-end justify-center">
+                    <img src="sign1.png" alt="Signature 1" className="h-14 object-contain" />
+                  </div>
+                  <div className="border-t-2 border-gray-900 pt-1">
+                    <p className="font-bold text-gray-800 text-xs">Program Coordinator</p>
+                    <p className="text-xs text-gray-700">Ahibba Summit</p>
+                  </div>
+                </div>
+
+                {/* Certificate Number - Center */}
+                <div className="text-center flex-1 px-4">
+                  <p className="text-xs text-gray-600 mb-2">
+                    Certificate No: {userData.id.substring(0, 12).toUpperCase()}
+                  </p>
+                  <p className="text-xs text-gray-600 font-semibold">
+                    {new Date().toLocaleDateString('en-IN', { year: 'numeric', month: 'long', day: 'numeric' })}
+                  </p>
+                  <p className="text-xs text-gray-700 mt-2 font-semibold">Issued by YES INDIA Foundation</p>
+                </div>
+
+                {/* Managing Director - Right */}
+                <div className="text-center w-32">
+                  <div className="h-16 mb-2 flex items-end justify-center">
+                    <img src="sign2.png" alt="Signature 2" className="h-14 object-contain" />
+                  </div>
+                  <div className="border-t-2 border-gray-900 pt-1">
+                    <p className="font-bold text-gray-800 text-xs">Managing Director</p>
+                    <p className="text-xs text-gray-700">YES INDIA Foundation</p>
+                  </div>
+                </div>
               </div>
             </div>
           </div>

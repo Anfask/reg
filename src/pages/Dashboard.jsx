@@ -747,30 +747,34 @@ export default function AdminDashboard() {
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
       <nav className="bg-gradient-to-r from-blue-600 to-blue-800 shadow-lg">
-        <div className="container mx-auto px-4 py-4">
-          <div className="flex justify-between items-center">
-            <div className="flex items-center space-x-3">
-              <div className="bg-white p-2 rounded-lg">
-                <HiOutlineChartBar className="text-2xl text-blue-600" />
-              </div>
-              <div>
-                <h1 className="text-2xl font-bold text-white">Ahibba Summit 2025</h1>
-                <p className="text-sm text-blue-100 flex items-center">
-                  <FiTrendingUp className="mr-1" />
-                  Admin Dashboard
-                </p>
-              </div>
-            </div>
-            <button
-              onClick={handleLogout}
-              className="bg-red-500 hover:bg-red-600 text-white font-medium py-2 px-4 rounded-lg shadow-sm transition-colors flex items-center space-x-2"
-            >
-              <FiLogOut className="text-lg" />
-              <span>Logout</span>
-            </button>
-          </div>
+  <div className="container mx-auto px-4 py-4">
+    <div className="flex justify-between items-center">
+      <div className="flex items-center space-x-4">
+        <div className="p-2 rounded-lg">
+          <img 
+            src="/yeslogo.png" 
+            alt="Ahibba Summit Logo" 
+            className="h-8 w-auto object-contain"
+          />
         </div>
-      </nav>
+        <div>
+          <h1 className="text-2xl font-bold text-white">Ahibba Summit 2025</h1>
+          <p className="text-sm text-blue-100 flex items-center">
+            <FiTrendingUp className="mr-1" />
+            Admin Dashboard
+          </p>
+        </div>
+      </div>
+      <button
+        onClick={handleLogout}
+        className="bg-white/20 hover:bg-white/30 text-white font-semibold py-2.5 px-6 rounded-lg shadow-md transition-all duration-300 flex items-center space-x-2 border border-white/30 hover:border-white/40 hover:scale-105"
+      >
+        <FiLogOut className="text-lg" />
+        <span>Logout</span>
+      </button>
+    </div>
+  </div>
+</nav>
 
       <main className="container mx-auto px-4 py-6">
         {/* Loading Overlay */}
