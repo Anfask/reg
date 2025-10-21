@@ -21,6 +21,7 @@ export default function LandingPage() {
     "Surankote",
     "Rajouri",
     "Jammu",
+    "Srinagar",
     "North East",
     "South",
     "Rajasthan",
