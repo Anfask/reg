@@ -88,8 +88,13 @@ export default function LandingPage() {
       <div className="absolute bottom-0 left-0 w-80 h-80 bg-teal-900/30 rounded-full blur-3xl"></div>
 
       <header className="bg-white/5 backdrop-blur-md border-b border-white/10 relative z-10">
-        <div className="container mx-auto px-4 py-4">
-          <h1 className="text-white text-2xl font-bold">YES INDIA Foundation</h1>
+        <div className="container mx-auto px-4 py-4 flex items-center">
+          {/* Replaced text with logo image - ensure yeslogo.png is served at /yeslogo.png */}
+          <img
+            src="/yeslogo.png"
+            alt="YES Logo"
+            className="h-12 w-auto object-contain"
+          />
         </div>
       </header>
 
@@ -112,6 +117,15 @@ export default function LandingPage() {
                   <p className="text-emerald-200 text-lg font-light mb-4">
                     "Empowering <span className="text-white font-semibold">Change</span>, Inspiring <span className="text-white font-semibold">Action</span>!"
                   </p>
+
+                  {/* Added the heading image directly below the quote - ensure ahibba.png is served at /ahibba.png */}
+                  <div className="flex justify-center mb-8">
+                    <img
+                      src="/ahibba.png"
+                      alt="Ahibba Heading"
+                      className="w-80 h-auto rounded-lg"
+                    />
+                  </div>
 
                   <div className="flex items-center space-x-4 mb-8">
                     <div className="flex-1 h-1 bg-gradient-to-r from-yellow-300 to-transparent rounded-full"></div>
@@ -137,7 +151,7 @@ export default function LandingPage() {
                         </svg>
                       </div>
                       <div>
-                        <p className="text-white font-semibold text-lg">@Poonch</p>
+                        <p className="text-white font-semibold text-lg">Poonch</p>
                         <p className="text-emerald-200 text-sm">Jammu & Kashmir Region</p>
                       </div>
                     </div>
