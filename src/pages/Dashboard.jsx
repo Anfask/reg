@@ -6,6 +6,31 @@ import { db } from "../config/firebase";
 import { BarChart, XAxis, YAxis, CartesianGrid, Tooltip, Bar, PieChart, Pie, Cell, ResponsiveContainer } from "recharts";
 import { jsPDF } from "jspdf";
 import Swal from 'sweetalert2';
+import { 
+  FiLogOut, 
+  FiUsers, 
+  FiCalendar, 
+  FiCheckSquare, 
+  FiSearch, 
+  FiFilter,
+  FiDownload,
+  FiFileText,
+  FiBarChart2,
+  FiPieChart,
+  FiMapPin,
+  FiUserCheck,
+  FiFile,
+  FiFilePlus,
+  FiTrendingUp,
+  FiPrinter
+} from "react-icons/fi";
+import { 
+  HiOutlineUserGroup,
+  HiOutlineCalendar,
+  HiOutlineCheckCircle,
+  HiOutlineChartBar,
+  HiOutlineChartPie
+} from "react-icons/hi";
 
 const ZONES = [
   "Poonch",
@@ -17,7 +42,8 @@ const ZONES = [
   "North East",
   "South",
   "Rajasthan",
-  "Maharashta"
+  "Maharashta",
+  "Not Applicable"
 ];
 
 export default function AdminDashboard() {
@@ -498,82 +524,126 @@ export default function AdminDashboard() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-100">
-      <nav className="bg-gradient-to-r from-blue-600 to-blue-800 shadow-md">
+    <div className="min-h-screen bg-gray-50">
+      {/* Header */}
+      <nav className="bg-gradient-to-r from-blue-600 to-blue-800 shadow-lg">
         <div className="container mx-auto px-4 py-4">
           <div className="flex justify-between items-center">
-            <div>
-              <h1 className="text-2xl font-bold text-white">Ahibba Summit 2025</h1>
-              <p className="text-sm text-blue-100">Admin Dashboard</p>
+            <div className="flex items-center space-x-3">
+              <div className="bg-white p-2 rounded-lg">
+                <HiOutlineChartBar className="text-2xl text-blue-600" />
+              </div>
+              <div>
+                <h1 className="text-2xl font-bold text-white">Ahibba Summit 2025</h1>
+                <p className="text-sm text-blue-100 flex items-center">
+                  <FiTrendingUp className="mr-1" />
+                  Admin Dashboard
+                </p>
+              </div>
             </div>
             <button
               onClick={handleLogout}
-              className="bg-red-500 hover:bg-red-600 text-white font-medium py-2 px-4 rounded-md shadow-sm transition-colors"
+              className="bg-red-500 hover:bg-red-600 text-white font-medium py-2 px-4 rounded-lg shadow-sm transition-colors flex items-center space-x-2"
             >
-              Logout
+              <FiLogOut className="text-lg" />
+              <span>Logout</span>
             </button>
           </div>
         </div>
       </nav>
 
       <main className="container mx-auto px-4 py-6">
+        {/* Loading Overlay */}
         {loading && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white p-6 rounded-lg shadow-lg">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-              <p className="mt-4 text-gray-700">Loading dashboard data...</p>
+            <div className="bg-white p-8 rounded-2xl shadow-2xl flex flex-col items-center">
+              <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-blue-600 mb-4"></div>
+              <p className="text-gray-700 font-medium">Loading dashboard data...</p>
             </div>
           </div>
         )}
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+        {/* Stats Cards */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
           <motion.div
             initial={{ y: 20, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
-            className="bg-white p-5 rounded-lg shadow-md border-t-4 border-blue-500"
+            className="bg-white p-6 rounded-xl shadow-md border-l-4 border-blue-500 hover:shadow-lg transition-shadow"
           >
-            <h3 className="text-sm font-medium text-gray-500 mb-1">Total Registered</h3>
-            <p className="text-3xl font-bold text-gray-800">{stats.totalRegistered}</p>
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-sm font-medium text-gray-500 mb-1">Total Registered</h3>
+                <p className="text-3xl font-bold text-gray-800">{stats.totalRegistered}</p>
+              </div>
+              <div className="bg-blue-100 p-3 rounded-full">
+                <HiOutlineUserGroup className="text-2xl text-blue-600" />
+              </div>
+            </div>
           </motion.div>
 
           <motion.div
             initial={{ y: 20, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
             transition={{ delay: 0.1 }}
-            className="bg-white p-5 rounded-lg shadow-md border-t-4 border-blue-400"
+            className="bg-white p-6 rounded-xl shadow-md border-l-4 border-blue-400 hover:shadow-lg transition-shadow"
           >
-            <h3 className="text-sm font-medium text-gray-500 mb-1">Day 1 Attendance</h3>
-            <p className="text-3xl font-bold text-gray-800">{stats.day1Attendance}</p>
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-sm font-medium text-gray-500 mb-1">Day 1 Attendance</h3>
+                <p className="text-3xl font-bold text-gray-800">{stats.day1Attendance}</p>
+              </div>
+              <div className="bg-blue-100 p-3 rounded-full">
+                <HiOutlineCalendar className="text-2xl text-blue-400" />
+              </div>
+            </div>
           </motion.div>
 
           <motion.div
             initial={{ y: 20, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
             transition={{ delay: 0.15 }}
-            className="bg-white p-5 rounded-lg shadow-md border-t-4 border-green-500"
+            className="bg-white p-6 rounded-xl shadow-md border-l-4 border-green-500 hover:shadow-lg transition-shadow"
           >
-            <h3 className="text-sm font-medium text-gray-500 mb-1">Day 2 Attendance</h3>
-            <p className="text-3xl font-bold text-gray-800">{stats.day2Attendance}</p>
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-sm font-medium text-gray-500 mb-1">Day 2 Attendance</h3>
+                <p className="text-3xl font-bold text-gray-800">{stats.day2Attendance}</p>
+              </div>
+              <div className="bg-green-100 p-3 rounded-full">
+                <FiCalendar className="text-2xl text-green-500" />
+              </div>
+            </div>
           </motion.div>
 
           <motion.div
             initial={{ y: 20, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
             transition={{ delay: 0.2 }}
-            className="bg-white p-5 rounded-lg shadow-md border-t-4 border-purple-500"
+            className="bg-white p-6 rounded-xl shadow-md border-l-4 border-purple-500 hover:shadow-lg transition-shadow"
           >
-            <h3 className="text-sm font-medium text-gray-500 mb-1">Both Days</h3>
-            <p className="text-3xl font-bold text-gray-800">{stats.bothDays}</p>
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-sm font-medium text-gray-500 mb-1">Both Days</h3>
+                <p className="text-3xl font-bold text-gray-800">{stats.bothDays}</p>
+              </div>
+              <div className="bg-purple-100 p-3 rounded-full">
+                <HiOutlineCheckCircle className="text-2xl text-purple-500" />
+              </div>
+            </div>
           </motion.div>
         </div>
 
+        {/* Charts Section */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
           <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
-            className="bg-white p-6 rounded-lg shadow-md"
+            className="bg-white p-6 rounded-xl shadow-md hover:shadow-lg transition-shadow"
           >
-            <h3 className="text-lg font-semibold text-gray-800 mb-4">Attendance Overview</h3>
+            <div className="flex items-center space-x-2 mb-4">
+              <FiBarChart2 className="text-xl text-blue-600" />
+              <h3 className="text-lg font-semibold text-gray-800">Attendance Overview</h3>
+            </div>
             <div className="h-64">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={chartData}>
@@ -581,7 +651,7 @@ export default function AdminDashboard() {
                   <XAxis dataKey="name" />
                   <YAxis />
                   <Tooltip />
-                  <Bar dataKey="count" fill="#3B82F6" />
+                  <Bar dataKey="count" fill="#3B82F6" radius={[4, 4, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -591,9 +661,12 @@ export default function AdminDashboard() {
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ delay: 0.1 }}
-            className="bg-white p-6 rounded-lg shadow-md"
+            className="bg-white p-6 rounded-xl shadow-md hover:shadow-lg transition-shadow"
           >
-            <h3 className="text-lg font-semibold text-gray-800 mb-4">Attendance Distribution</h3>
+            <div className="flex items-center space-x-2 mb-4">
+              <HiOutlineChartPie className="text-xl text-green-600" />
+              <h3 className="text-lg font-semibold text-gray-800">Attendance Distribution</h3>
+            </div>
             <div className="h-64">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
@@ -618,29 +691,52 @@ export default function AdminDashboard() {
           </motion.div>
         </div>
 
+        {/* Zone Statistics */}
         <motion.div
           initial={{ y: 20, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
-          className="bg-white p-6 rounded-lg shadow-md mb-8"
+          className="bg-white p-6 rounded-xl shadow-md mb-8 hover:shadow-lg transition-shadow"
         >
-          <h3 className="text-lg font-semibold text-gray-800 mb-4">Zone-wise Statistics</h3>
+          <div className="flex items-center space-x-2 mb-4">
+            <FiMapPin className="text-xl text-orange-600" />
+            <h3 className="text-lg font-semibold text-gray-800">Zone-wise Statistics</h3>
+          </div>
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Zone</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Registered</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Day 1</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Day 2</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <div className="flex items-center space-x-1">
+                      <FiMapPin className="text-sm" />
+                      <span>Zone</span>
+                    </div>
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Registered
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Day 1
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Day 2
+                  </th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {zoneStats.map((stat, idx) => (
-                  <tr key={idx} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{stat.zone}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{stat.registered}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-blue-600 font-semibold">{stat.day1}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-green-600 font-semibold">{stat.day2}</td>
+                  <tr key={idx} className="hover:bg-gray-50 transition-colors">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                      {stat.zone}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {stat.registered}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-blue-600 font-semibold">
+                      {stat.day1}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-green-600 font-semibold">
+                      {stat.day2}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -648,68 +744,85 @@ export default function AdminDashboard() {
           </div>
         </motion.div>
 
+        {/* Report Generation */}
         <motion.div
           initial={{ y: 20, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
-          className="bg-white p-6 rounded-lg shadow-md mb-8"
+          className="bg-white p-6 rounded-xl shadow-md mb-8 hover:shadow-lg transition-shadow"
         >
-          <h3 className="text-lg font-semibold text-gray-800 mb-4">Generate Reports</h3>
+          <div className="flex items-center space-x-2 mb-4">
+            <FiDownload className="text-xl text-purple-600" />
+            <h3 className="text-lg font-semibold text-gray-800">Generate Reports</h3>
+          </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             <button
               onClick={generatePDFReport}
-              className="bg-purple-600 hover:bg-purple-700 text-white font-semibold py-3 px-4 rounded-lg shadow-md transition-colors flex flex-col items-center"
+              className="bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text-white font-semibold py-4 px-4 rounded-xl shadow-md transition-all transform hover:scale-105 flex flex-col items-center"
             >
-              <span className="text-lg">📊</span>
+              <FiFileText className="text-2xl mb-2" />
               <span>PDF Report</span>
             </button>
             <button
               onClick={generateDetailedPDF}
-              className="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-4 rounded-lg shadow-md transition-colors flex flex-col items-center"
+              className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-semibold py-4 px-4 rounded-xl shadow-md transition-all transform hover:scale-105 flex flex-col items-center"
             >
-              <span className="text-lg">📋</span>
+              <FiFilePlus className="text-2xl mb-2" />
               <span>Detailed PDF</span>
             </button>
             <button
               onClick={generateCSVReport}
-              className="bg-green-600 hover:bg-green-700 text-white font-semibold py-3 px-4 rounded-lg shadow-md transition-colors flex flex-col items-center"
+              className="bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white font-semibold py-4 px-4 rounded-xl shadow-md transition-all transform hover:scale-105 flex flex-col items-center"
             >
-              <span className="text-lg">📄</span>
+              <FiFile className="text-2xl mb-2" />
               <span>CSV Export</span>
             </button>
             <button
               onClick={generateTextReport}
-              className="bg-orange-600 hover:bg-orange-700 text-white font-semibold py-3 px-4 rounded-lg shadow-md transition-colors flex flex-col items-center"
+              className="bg-gradient-to-r from-orange-600 to-orange-700 hover:from-orange-700 hover:to-orange-800 text-white font-semibold py-4 px-4 rounded-xl shadow-md transition-all transform hover:scale-105 flex flex-col items-center"
             >
-              <span className="text-lg">📝</span>
+              <FiPrinter className="text-2xl mb-2" />
               <span>Text Report</span>
             </button>
           </div>
         </motion.div>
 
+        {/* Filters */}
         <motion.div
           initial={{ y: 20, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
-          className="bg-white p-6 rounded-lg shadow-md mb-8"
+          className="bg-white p-6 rounded-xl shadow-md mb-8 hover:shadow-lg transition-shadow"
         >
-          <h3 className="text-lg font-semibold text-gray-800 mb-4">Filters</h3>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="flex items-center space-x-2 mb-4">
+            <FiFilter className="text-xl text-gray-600" />
+            <h3 className="text-lg font-semibold text-gray-800">Filters</h3>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Search by Name/Mobile</label>
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={handleSearchChange}
-                placeholder="Enter name or mobile..."
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
+              <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center space-x-1">
+                <FiSearch className="text-sm" />
+                <span>Search by Name/Mobile</span>
+              </label>
+              <div className="relative">
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={handleSearchChange}
+                  placeholder="Enter name or mobile..."
+                  className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
+                />
+                <FiSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+              </div>
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Zone</label>
+              <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center space-x-1">
+                <FiMapPin className="text-sm" />
+                <span>Zone</span>
+              </label>
               <select
                 value={zoneFilter}
                 onChange={handleZoneFilter}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
               >
                 <option value="">All Zones</option>
                 {ZONES.map((zone) => (
@@ -719,11 +832,14 @@ export default function AdminDashboard() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Attendance Status</label>
+              <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center space-x-1">
+                <FiUserCheck className="text-sm" />
+                <span>Attendance Status</span>
+              </label>
               <select
                 value={attendanceFilter}
                 onChange={handleAttendanceFilter}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
               >
                 <option value="all">All Users</option>
                 <option value="day1">Day 1 Attended</option>
@@ -735,16 +851,20 @@ export default function AdminDashboard() {
           </div>
         </motion.div>
 
+        {/* Users Table */}
         <motion.div
           initial={{ y: 20, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
-          className="bg-white p-6 rounded-lg shadow-md"
+          className="bg-white p-6 rounded-xl shadow-md hover:shadow-lg transition-shadow"
         >
           <div className="flex justify-between items-center mb-4">
-            <h3 className="text-lg font-semibold text-gray-800">
-              Registered Users ({filteredUsers.length})
-            </h3>
-            <span className="text-sm text-gray-500">
+            <div className="flex items-center space-x-2">
+              <FiUsers className="text-xl text-gray-600" />
+              <h3 className="text-lg font-semibold text-gray-800">
+                Registered Users ({filteredUsers.length})
+              </h3>
+            </div>
+            <span className="text-sm text-gray-500 bg-gray-100 px-3 py-1 rounded-full">
               Showing {filteredUsers.length} of {registeredUsers.length} users
             </span>
           </div>
@@ -753,12 +873,24 @@ export default function AdminDashboard() {
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Mobile</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Designation</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Zone</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Day 1</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Day 2</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Name
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Mobile
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Designation
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Zone
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Day 1
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Day 2
+                  </th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
@@ -770,26 +902,32 @@ export default function AdminDashboard() {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{user.mobile}</td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{user.designation}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{user.zone}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                          {user.zone}
+                        </span>
+                      </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-center">
                         {user.day1Attendance ? (
-                          <span className="px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
-                            ✓
+                          <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-800">
+                            <FiCheckSquare className="mr-1" />
+                            Present
                           </span>
                         ) : (
-                          <span className="px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800">
-                            ✗
+                          <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-red-100 text-red-800">
+                            ✗ Absent
                           </span>
                         )}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-center">
                         {user.day2Attendance ? (
-                          <span className="px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
-                            ✓
+                          <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-800">
+                            <FiCheckSquare className="mr-1" />
+                            Present
                           </span>
                         ) : (
-                          <span className="px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800">
-                            ✗
+                          <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-red-100 text-red-800">
+                            ✗ Absent
                           </span>
                         )}
                       </td>
@@ -797,8 +935,12 @@ export default function AdminDashboard() {
                   ))
                 ) : (
                   <tr>
-                    <td colSpan="6" className="px-6 py-4 text-sm text-gray-500 text-center">
-                      No users found matching your filters
+                    <td colSpan="6" className="px-6 py-8 text-center">
+                      <div className="flex flex-col items-center justify-center text-gray-500">
+                        <FiUsers className="text-4xl mb-2 text-gray-300" />
+                        <p className="text-lg font-medium">No users found</p>
+                        <p className="text-sm">Try adjusting your filters</p>
+                      </div>
                     </td>
                   </tr>
                 )}

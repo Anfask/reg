@@ -24,8 +24,12 @@ export default function LandingPage() {
     "North East",
     "South",
     "Rajasthan",
-    "Maharashta"
+    "Maharashta",
+    "Not Applicable"
   ];
+
+  // Zones for display in the participating regions section (without "Not Applicable")
+  const displayZones = zones.filter(zone => zone !== "Not Applicable");
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -205,7 +209,7 @@ export default function LandingPage() {
                 <div className="bg-white/10 backdrop-blur-md rounded-2xl p-6 border border-white/20">
                   <h3 className="text-white font-bold text-lg mb-4">Participating Regions</h3>
                   <div className="space-y-3">
-                    {zones.map((region, index) => (
+                    {displayZones.map((region, index) => (
                       <motion.div
                         key={index}
                         initial={{ x: 10, opacity: 0 }}
