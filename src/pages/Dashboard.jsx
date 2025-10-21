@@ -26,7 +26,8 @@ import {
   FiEdit2,
   FiTrash2,
   FiX,
-  FiSave
+  FiSave,
+  FiClock
 } from "react-icons/fi";
 import { 
   HiOutlineUserGroup,
@@ -54,6 +55,65 @@ const ZONES = [
   "Not Applicable"
 ];
 
+// Helper function to format Firebase timestamp
+const formatFirebaseTimestamp = (timestamp) => {
+  if (!timestamp) return "N/A";
+  
+  try {
+    // Handle both Firestore timestamp object and string date
+    if (timestamp.toDate && typeof timestamp.toDate === 'function') {
+      // It's a Firestore timestamp
+      const date = timestamp.toDate();
+      return date.toLocaleDateString('en-IN', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: true
+      });
+    } else if (typeof timestamp === 'string') {
+      // It's already a string date
+      return timestamp;
+    } else if (timestamp.seconds) {
+      // It's a timestamp with seconds
+      const date = new Date(timestamp.seconds * 1000);
+      return date.toLocaleDateString('en-IN', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: true
+      });
+    }
+    
+    return "Invalid Date";
+  } catch (error) {
+    console.error("Error formatting timestamp:", error);
+    return "N/A";
+  }
+};
+
+// Helper function to get date only for sorting/grouping
+const getDateOnly = (timestamp) => {
+  if (!timestamp) return new Date(0);
+  
+  try {
+    if (timestamp.toDate && typeof timestamp.toDate === 'function') {
+      return timestamp.toDate();
+    } else if (timestamp.seconds) {
+      return new Date(timestamp.seconds * 1000);
+    } else if (typeof timestamp === 'string') {
+      return new Date(timestamp);
+    }
+    return new Date(0);
+  } catch (error) {
+    console.error("Error parsing timestamp:", error);
+    return new Date(0);
+  }
+};
+
 export default function AdminDashboard() {
   const [registeredUsers, setRegisteredUsers] = useState([]);
   const [filteredUsers, setFilteredUsers] = useState([]);
@@ -64,12 +124,21 @@ export default function AdminDashboard() {
   const [editingUser, setEditingUser] = useState(null);
   const [editFormData, setEditFormData] = useState({});
   const [reportFilter, setReportFilter] = useState("all");
+  const [reportZoneFilter, setReportZoneFilter] = useState("");
 
   useEffect(() => {
     const unsubscribe = onSnapshot(collection(db, "registration"), (snapshot) => {
       const data = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
-      setRegisteredUsers(data);
-      filterUsers(data, searchQuery, zoneFilter, attendanceFilter);
+      
+      // Sort users by registration date (newest first)
+      const sortedData = data.sort((a, b) => {
+        const dateA = getDateOnly(a.registeredAt || a.timestamp);
+        const dateB = getDateOnly(b.registeredAt || b.timestamp);
+        return dateB - dateA; // Descending order (newest first)
+      });
+      
+      setRegisteredUsers(sortedData);
+      filterUsers(sortedData, searchQuery, zoneFilter, attendanceFilter);
       setLoading(false);
     });
     return () => unsubscribe();
@@ -82,8 +151,8 @@ export default function AdminDashboard() {
       const lowerSearch = search.toLowerCase();
       filtered = filtered.filter(
         (u) =>
-          u.name.toLowerCase().includes(lowerSearch) ||
-          u.mobile.includes(lowerSearch)
+          u.name?.toLowerCase().includes(lowerSearch) ||
+          u.mobile?.includes(lowerSearch)
       );
     }
 
@@ -170,7 +239,14 @@ export default function AdminDashboard() {
 
   const handleEditClick = (user) => {
     setEditingUser(user.id);
-    setEditFormData({ ...user });
+    setEditFormData({ 
+      name: user.name || "",
+      mobile: user.mobile || "",
+      designation: user.designation || "",
+      zone: user.zone || "",
+      day1Attendance: user.day1Attendance || false,
+      day2Attendance: user.day2Attendance || false
+    });
   };
 
   const handleEditChange = (field, value) => {
@@ -188,6 +264,18 @@ export default function AdminDashboard() {
   };
 
   const handleSaveEdit = async () => {
+    if (!editFormData.name || !editFormData.mobile || !editFormData.designation || !editFormData.zone) {
+      Swal.fire({
+        title: 'Error!',
+        text: 'Please fill all required fields.',
+        icon: 'error',
+        confirmButtonColor: '#3085d6',
+        background: '#fff',
+        color: '#333'
+      });
+      return;
+    }
+
     try {
       const userRef = doc(db, "registration", editingUser);
       await updateDoc(userRef, {
@@ -301,7 +389,7 @@ export default function AdminDashboard() {
   };
 
   const getFilteredDataForReport = () => {
-    let data = filteredUsers;
+    let data = registeredUsers;
 
     if (reportFilter === "day1") {
       data = data.filter(u => u.day1Attendance);
@@ -311,6 +399,10 @@ export default function AdminDashboard() {
       data = data.filter(u => u.day1Attendance && u.day2Attendance);
     } else if (reportFilter === "none") {
       data = data.filter(u => !u.day1Attendance && !u.day2Attendance);
+    }
+
+    if (reportZoneFilter) {
+      data = data.filter(u => u.zone === reportZoneFilter);
     }
 
     return data;
@@ -333,9 +425,11 @@ export default function AdminDashboard() {
 
         // Filter info
         doc.setFontSize(10);
-        let filterInfo = "Filter: ";
-        if (zoneFilter) filterInfo += `Zone: ${zoneFilter}, `;
+        let filterInfo = "Filters: ";
+        if (reportZoneFilter) filterInfo += `Zone: ${reportZoneFilter}, `;
         if (reportFilter !== "all") filterInfo += `Attendance: ${reportFilter}`;
+        if (filterInfo === "Filters: ") filterInfo = "Filters: All Users";
+        
         doc.text(filterInfo, 14, yPosition);
         yPosition += 6;
         doc.text(`Generated: ${new Date().toLocaleDateString()}`, 14, yPosition);
@@ -471,13 +565,13 @@ export default function AdminDashboard() {
             doc.setFontSize(9);
           }
 
-          const bothDays = stat.registered - (stat.registered - (stat.day1 > stat.day2 ? stat.day1 : stat.day2));
+          const bothDays = registeredUsers.filter(u => u.zone === stat.zone && u.day1Attendance && u.day2Attendance).length;
           
           doc.text(stat.zone, 20, yPosition);
           doc.text(stat.registered.toString(), 80, yPosition);
           doc.text(stat.day1.toString(), 120, yPosition);
           doc.text(stat.day2.toString(), 150, yPosition);
-          doc.text(registeredUsers.filter(u => u.zone === stat.zone && u.day1Attendance && u.day2Attendance).length.toString(), 180, yPosition);
+          doc.text(bothDays.toString(), 180, yPosition);
           
           doc.setDrawColor(200, 200, 200);
           doc.line(14, yPosition + 1, 196, yPosition + 1);
@@ -524,11 +618,18 @@ export default function AdminDashboard() {
         doc.text("Ahibba Summit 2025 - Complete Registration Details", 14, yPosition);
         yPosition += 12;
 
-        // Date and summary
+        // Filter info
         doc.setFontSize(10);
-        doc.text(`Generated: ${new Date().toLocaleDateString()}`, 14, yPosition);
+        let filterInfo = "Filters: ";
+        if (reportZoneFilter) filterInfo += `Zone: ${reportZoneFilter}, `;
+        if (reportFilter !== "all") filterInfo += `Attendance: ${reportFilter}`;
+        if (filterInfo === "Filters: ") filterInfo = "Filters: All Users";
+        
+        doc.text(filterInfo, 14, yPosition);
         yPosition += 5;
         doc.text(`Total Records: ${reportData.length}`, 14, yPosition);
+        yPosition += 5;
+        doc.text(`Generated: ${new Date().toLocaleDateString()}`, 14, yPosition);
         yPosition += 10;
 
         // Detailed table
@@ -591,10 +692,8 @@ export default function AdminDashboard() {
           doc.text(user.day2Attendance ? "✓" : "✗", 165, yPosition);
           
           // Registration date
-          const regDate = user.timestamp 
-            ? new Date(user.timestamp.seconds * 1000).toLocaleDateString()
-            : "N/A";
-          doc.text(regDate, 180, yPosition);
+          const regDate = formatFirebaseTimestamp(user.registeredAt || user.timestamp);
+          doc.text(regDate.substring(0, 10), 180, yPosition); // Show only date part
 
           // Row separator
           doc.setDrawColor(220, 220, 220);
@@ -646,7 +745,7 @@ export default function AdminDashboard() {
             `"${(user.zone || 'N/A').replace(/"/g, '""')}"`,
             `"${user.day1Attendance ? 'Present' : 'Absent'}"`,
             `"${user.day2Attendance ? 'Present' : 'Absent'}"`,
-            `"${user.timestamp ? new Date(user.timestamp.seconds * 1000).toLocaleDateString() : 'N/A'}"`
+            `"${formatFirebaseTimestamp(user.registeredAt || user.timestamp)}"`
           ])
         ];
 
@@ -693,6 +792,14 @@ export default function AdminDashboard() {
         const reportData = getFilteredDataForReport();
         let textContent = `AHIBBA SUMMIT 2025 - REGISTRATION REPORT\n`;
         textContent += `Generated: ${new Date().toLocaleDateString()}\n`;
+        
+        // Filter info
+        let filterInfo = "Filters: ";
+        if (reportZoneFilter) filterInfo += `Zone: ${reportZoneFilter}, `;
+        if (reportFilter !== "all") filterInfo += `Attendance: ${reportFilter}`;
+        if (filterInfo === "Filters: ") filterInfo = "Filters: All Users";
+        textContent += `${filterInfo}\n`;
+        
         textContent += `Total Records: ${reportData.length}\n\n`;
         textContent += `SUMMARY:\n`;
         textContent += `Total Records in Report: ${reportData.length}\n`;
@@ -700,8 +807,8 @@ export default function AdminDashboard() {
         textContent += `Day 2 Attendance: ${reportData.filter(u => u.day2Attendance).length}\n`;
         textContent += `Both Days: ${reportData.filter(u => u.day1Attendance && u.day2Attendance).length}\n\n`;
         textContent += `DETAILED REGISTRATION:\n`;
-        textContent += `Name\tMobile\tDesignation\tZone\tDay1\tDay2\n`;
-        textContent += `----\t------\t-----------\t----\t----\t----\n`;
+        textContent += `Name\tMobile\tDesignation\tZone\tDay1\tDay2\tRegistration Date\n`;
+        textContent += `----\t------\t-----------\t----\t----\t----\t-----------------\n`;
         
         reportData.forEach(user => {
           textContent += `${user.name || 'N/A'}\t`;
@@ -709,7 +816,8 @@ export default function AdminDashboard() {
           textContent += `${user.designation || 'N/A'}\t`;
           textContent += `${user.zone || 'N/A'}\t`;
           textContent += `${user.day1Attendance ? 'Yes' : 'No'}\t`;
-          textContent += `${user.day2Attendance ? 'Yes' : 'No'}\n`;
+          textContent += `${user.day2Attendance ? 'Yes' : 'No'}\t`;
+          textContent += `${formatFirebaseTimestamp(user.registeredAt || user.timestamp)}\n`;
         });
 
         const blob = new Blob([textContent], { type: 'text/plain;charset=utf-8' });
@@ -747,34 +855,34 @@ export default function AdminDashboard() {
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
       <nav className="bg-gradient-to-r from-blue-600 to-blue-800 shadow-lg">
-  <div className="container mx-auto px-4 py-4">
-    <div className="flex justify-between items-center">
-      <div className="flex items-center space-x-4">
-        <div className="p-2 rounded-lg">
-          <img 
-            src="/yeslogo.png" 
-            alt="Ahibba Summit Logo" 
-            className="h-8 w-auto object-contain"
-          />
+        <div className="container mx-auto px-4 py-4">
+          <div className="flex justify-between items-center">
+            <div className="flex items-center space-x-4">
+              <div className="p-2 rounded-lg">
+                <img 
+                  src="/yeslogo.png" 
+                  alt="Ahibba Summit Logo" 
+                  className="h-8 w-auto object-contain"
+                />
+              </div>
+              <div>
+                <h1 className="text-2xl font-bold text-white">Ahibba Summit 2025</h1>
+                <p className="text-sm text-blue-100 flex items-center">
+                  <FiTrendingUp className="mr-1" />
+                  Admin Dashboard
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={handleLogout}
+              className="bg-white/20 hover:bg-white/30 text-white font-semibold py-2.5 px-6 rounded-lg shadow-md transition-all duration-300 flex items-center space-x-2 border border-white/30 hover:border-white/40 hover:scale-105"
+            >
+              <FiLogOut className="text-lg" />
+              <span>Logout</span>
+            </button>
+          </div>
         </div>
-        <div>
-          <h1 className="text-2xl font-bold text-white">Ahibba Summit 2025</h1>
-          <p className="text-sm text-blue-100 flex items-center">
-            <FiTrendingUp className="mr-1" />
-            Admin Dashboard
-          </p>
-        </div>
-      </div>
-      <button
-        onClick={handleLogout}
-        className="bg-white/20 hover:bg-white/30 text-white font-semibold py-2.5 px-6 rounded-lg shadow-md transition-all duration-300 flex items-center space-x-2 border border-white/30 hover:border-white/40 hover:scale-105"
-      >
-        <FiLogOut className="text-lg" />
-        <span>Logout</span>
-      </button>
-    </div>
-  </div>
-</nav>
+      </nav>
 
       <main className="container mx-auto px-4 py-6">
         {/* Loading Overlay */}
@@ -979,19 +1087,70 @@ export default function AdminDashboard() {
             <h3 className="text-lg font-semibold text-gray-800">Generate Reports</h3>
           </div>
           
-          <div className="mb-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
-            <label className="block text-sm font-medium text-gray-700 mb-2">Report Filter</label>
-            <select
-              value={reportFilter}
-              onChange={(e) => setReportFilter(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
-            >
-              <option value="all">All Users</option>
-              <option value="day1">Day 1 Attended Only</option>
-              <option value="day2">Day 2 Attended Only</option>
-              <option value="both">Both Days Attended</option>
-              <option value="none">Not Attended</option>
-            </select>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+            <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                <FiUserCheck className="inline mr-1" />
+                Attendance Filter
+              </label>
+              <select
+                value={reportFilter}
+                onChange={(e) => setReportFilter(e.target.value)}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
+              >
+                <option value="all">All Users</option>
+                <option value="day1">Day 1 Attended Only</option>
+                <option value="day2">Day 2 Attended Only</option>
+                <option value="both">Both Days Attended</option>
+                <option value="none">Not Attended</option>
+              </select>
+            </div>
+
+            <div className="p-4 bg-green-50 rounded-lg border border-green-200">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                <FiMapPin className="inline mr-1" />
+                Zone Filter
+              </label>
+              <select
+                value={reportZoneFilter}
+                onChange={(e) => setReportZoneFilter(e.target.value)}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
+              >
+                <option value="">All Zones</option>
+                {ZONES.map((zone) => (
+                  <option key={zone} value={zone}>{zone}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          {/* Report Summary */}
+          <div className="mb-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
+            <h4 className="text-sm font-medium text-gray-700 mb-2">Report Summary</h4>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-xs">
+              <div>
+                <span className="text-gray-500">Total Records:</span>
+                <span className="ml-2 font-semibold">{getFilteredDataForReport().length}</span>
+              </div>
+              <div>
+                <span className="text-gray-500">Day 1:</span>
+                <span className="ml-2 font-semibold text-blue-600">
+                  {getFilteredDataForReport().filter(u => u.day1Attendance).length}
+                </span>
+              </div>
+              <div>
+                <span className="text-gray-500">Day 2:</span>
+                <span className="ml-2 font-semibold text-green-600">
+                  {getFilteredDataForReport().filter(u => u.day2Attendance).length}
+                </span>
+              </div>
+              <div>
+                <span className="text-gray-500">Both Days:</span>
+                <span className="ml-2 font-semibold text-purple-600">
+                  {getFilteredDataForReport().filter(u => u.day1Attendance && u.day2Attendance).length}
+                </span>
+              </div>
+            </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
@@ -1085,7 +1244,7 @@ export default function AdminDashboard() {
               </label>
               <select
                 value={attendanceFilter}
-                onChange={handleAttendanceFilter}
+                onChange={(e) => handleAttendanceFilter(e)}
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
               >
                 <option value="all">All Users</option>
@@ -1104,7 +1263,7 @@ export default function AdminDashboard() {
             <motion.div
               initial={{ scale: 0.95, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
-              className="bg-white p-8 rounded-xl shadow-2xl max-w-md w-full"
+              className="bg-white p-8 rounded-xl shadow-2xl max-w-md w-full max-h-[90vh] overflow-y-auto"
             >
               <div className="flex justify-between items-center mb-6">
                 <h2 className="text-2xl font-bold text-gray-800 flex items-center space-x-2">
@@ -1112,8 +1271,11 @@ export default function AdminDashboard() {
                   <span>Edit User</span>
                 </h2>
                 <button
-                  onClick={() => setEditingUser(null)}
-                  className="text-gray-500 hover:text-gray-700"
+                  onClick={() => {
+                    setEditingUser(null);
+                    setEditFormData({});
+                  }}
+                  className="text-gray-500 hover:text-gray-700 transition-colors"
                 >
                   <FiX className="text-2xl" />
                 </button>
@@ -1121,41 +1283,44 @@ export default function AdminDashboard() {
 
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Name</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Name *</label>
                   <input
                     type="text"
                     value={editFormData.name || ""}
                     onChange={(e) => handleEditChange("name", e.target.value)}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
+                    placeholder="Enter user name"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Mobile</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Mobile *</label>
                   <input
                     type="text"
                     value={editFormData.mobile || ""}
                     onChange={(e) => handleEditChange("mobile", e.target.value)}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
+                    placeholder="Enter mobile number"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Designation</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Designation *</label>
                   <input
                     type="text"
                     value={editFormData.designation || ""}
                     onChange={(e) => handleEditChange("designation", e.target.value)}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
+                    placeholder="Enter designation"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Zone</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Zone *</label>
                   <select
                     value={editFormData.zone || ""}
                     onChange={(e) => handleEditChange("zone", e.target.value)}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
                   >
                     <option value="">Select Zone</option>
                     {ZONES.map((zone) => (
@@ -1164,38 +1329,48 @@ export default function AdminDashboard() {
                   </select>
                 </div>
 
-                <div className="flex space-x-4">
-                  <label className="flex items-center space-x-2 cursor-pointer">
+                <div className="grid grid-cols-2 gap-4 pt-2">
+                  <div className="flex items-center space-x-2 p-3 bg-gray-50 rounded-lg">
                     <input
                       type="checkbox"
                       checked={editFormData.day1Attendance || false}
                       onChange={() => handleToggleAttendance("day1Attendance")}
-                      className="rounded"
+                      className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
+                      id="day1Attendance"
                     />
-                    <span className="text-sm font-medium text-gray-700">Day 1 Attended</span>
-                  </label>
-                  <label className="flex items-center space-x-2 cursor-pointer">
+                    <label htmlFor="day1Attendance" className="text-sm font-medium text-gray-700 cursor-pointer">
+                      Day 1 Attended
+                    </label>
+                  </div>
+                  <div className="flex items-center space-x-2 p-3 bg-gray-50 rounded-lg">
                     <input
                       type="checkbox"
                       checked={editFormData.day2Attendance || false}
                       onChange={() => handleToggleAttendance("day2Attendance")}
-                      className="rounded"
+                      className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
+                      id="day2Attendance"
                     />
-                    <span className="text-sm font-medium text-gray-700">Day 2 Attended</span>
-                  </label>
+                    <label htmlFor="day2Attendance" className="text-sm font-medium text-gray-700 cursor-pointer">
+                      Day 2 Attended
+                    </label>
+                  </div>
                 </div>
 
-                <div className="flex space-x-3 pt-4">
+                <div className="flex space-x-3 pt-6">
                   <button
                     onClick={handleSaveEdit}
-                    className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors flex items-center justify-center space-x-2"
+                    disabled={!editFormData.name || !editFormData.mobile || !editFormData.designation || !editFormData.zone}
+                    className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white font-semibold py-3 px-4 rounded-lg transition-colors flex items-center justify-center space-x-2"
                   >
                     <FiSave />
                     <span>Save Changes</span>
                   </button>
                   <button
-                    onClick={() => setEditingUser(null)}
-                    className="flex-1 bg-gray-300 hover:bg-gray-400 text-gray-800 font-semibold py-2 px-4 rounded-lg transition-colors"
+                    onClick={() => {
+                      setEditingUser(null);
+                      setEditFormData({});
+                    }}
+                    className="flex-1 bg-gray-300 hover:bg-gray-400 text-gray-800 font-semibold py-3 px-4 rounded-lg transition-colors"
                   >
                     Cancel
                   </button>
@@ -1240,6 +1415,9 @@ export default function AdminDashboard() {
                     Zone
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Registration Date
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Day 1
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -1263,6 +1441,12 @@ export default function AdminDashboard() {
                         <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
                           {user.zone}
                         </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        <div className="flex items-center space-x-1">
+                          <FiClock className="text-gray-400 text-xs" />
+                          <span>{formatFirebaseTimestamp(user.registeredAt || user.timestamp)}</span>
+                        </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-center">
                         {user.day1Attendance ? (
@@ -1288,27 +1472,29 @@ export default function AdminDashboard() {
                           </span>
                         )}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-center space-x-2 flex">
-                        <button
-                          onClick={() => handleEditClick(user)}
-                          className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded-lg transition-colors flex items-center space-x-1"
-                        >
-                          <FiEdit2 className="text-sm" />
-                          <span>Edit</span>
-                        </button>
-                        <button
-                          onClick={() => handleDeleteClick(user.id, user.name)}
-                          className="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded-lg transition-colors flex items-center space-x-1"
-                        >
-                          <FiTrash2 className="text-sm" />
-                          <span>Delete</span>
-                        </button>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm">
+                        <div className="flex space-x-2 justify-center">
+                          <button
+                            onClick={() => handleEditClick(user)}
+                            className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded-lg transition-colors flex items-center space-x-1 text-xs"
+                          >
+                            <FiEdit2 className="text-xs" />
+                            <span>Edit</span>
+                          </button>
+                          <button
+                            onClick={() => handleDeleteClick(user.id, user.name)}
+                            className="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded-lg transition-colors flex items-center space-x-1 text-xs"
+                          >
+                            <FiTrash2 className="text-xs" />
+                            <span>Delete</span>
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))
                 ) : (
                   <tr>
-                    <td colSpan="7" className="px-6 py-8 text-center">
+                    <td colSpan="8" className="px-6 py-8 text-center">
                       <div className="flex flex-col items-center justify-center text-gray-500">
                         <FiUsers className="text-4xl mb-2 text-gray-300" />
                         <p className="text-lg font-medium">No users found</p>
