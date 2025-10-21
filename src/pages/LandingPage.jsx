@@ -25,11 +25,19 @@ export default function LandingPage() {
     "South",
     "Rajasthan",
     "Maharashta",
+    "PR Department",
+    "Academia Department",
+    "Directoroate",
     "Not Applicable"
   ];
 
-  // Zones for display in the participating regions section (without "Not Applicable")
-  const displayZones = zones.filter(zone => zone !== "Not Applicable");
+  // Zones for display in the participating regions section (excluding departments and "Not Applicable")
+  const displayZones = zones.filter(zone => 
+    zone !== "Not Applicable" && 
+    zone !== "PR Department" && 
+    zone !== "Academia Department" && 
+    zone !== "Directoroate"
+  );
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;

@@ -43,6 +43,9 @@ const ZONES = [
   "South",
   "Rajasthan",
   "Maharashta",
+  "PR Department",
+  "Academia Department",
+  "Directoroate",
   "Not Applicable"
 ];
 
