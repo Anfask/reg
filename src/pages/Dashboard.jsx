@@ -7,15 +7,16 @@ import { BarChart, XAxis, YAxis, CartesianGrid, Tooltip, Bar, PieChart, Pie, Cel
 import { jsPDF } from "jspdf";
 
 const ZONES = [
-  "Jammu & Kashmir",
-  "Rajasthan",
-  "Delhi",
-  "Bihar",
-  "West Bengal",
-  "Maharashtra",
-  "Andhra Pradesh",
-  "Karnataka",
-  "Kerala"
+  "Poonch",
+    "Mandi",
+    "Mendher",
+    "Surankote",
+    "Rajouri",
+    "Jammu",
+    "North East",
+    "South",
+    "Rajasthan",
+    "Maharashta"
 ];
 
 export default function AdminDashboard() {

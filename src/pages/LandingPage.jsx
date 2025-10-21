@@ -15,15 +15,16 @@ export default function LandingPage() {
   const [submitMessage, setSubmitMessage] = useState("");
 
   const zones = [
-    "Jammu & Kashmir",
+    "Poonch",
+    "Mandi",
+    "Mendher",
+    "Surankote",
+    "Rajouri",
+    "Jammu",
+    "North East",
+    "South",
     "Rajasthan",
-    "Delhi",
-    "Bihar",
-    "West Bengal",
-    "Maharashtra",
-    "Andhra Pradesh",
-    "Karnataka",
-    "Kerala"
+    "Maharashta"
   ];
 
   const handleInputChange = (e) => {
