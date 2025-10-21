@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { collection, onSnapshot } from "firebase/firestore";
+import { collection, onSnapshot, doc, updateDoc, deleteDoc } from "firebase/firestore";
 import { getAuth, signOut } from "firebase/auth";
 import { db } from "../config/firebase";
 import { BarChart, XAxis, YAxis, CartesianGrid, Tooltip, Bar, PieChart, Pie, Cell, ResponsiveContainer } from "recharts";
@@ -22,7 +22,11 @@ import {
   FiFile,
   FiFilePlus,
   FiTrendingUp,
-  FiPrinter
+  FiPrinter,
+  FiEdit2,
+  FiTrash2,
+  FiX,
+  FiSave
 } from "react-icons/fi";
 import { 
   HiOutlineUserGroup,
@@ -57,6 +61,9 @@ export default function AdminDashboard() {
   const [zoneFilter, setZoneFilter] = useState("");
   const [attendanceFilter, setAttendanceFilter] = useState("all");
   const [loading, setLoading] = useState(true);
+  const [editingUser, setEditingUser] = useState(null);
+  const [editFormData, setEditFormData] = useState({});
+  const [reportFilter, setReportFilter] = useState("all");
 
   useEffect(() => {
     const unsubscribe = onSnapshot(collection(db, "registration"), (snapshot) => {
@@ -161,6 +168,100 @@ export default function AdminDashboard() {
     }
   };
 
+  const handleEditClick = (user) => {
+    setEditingUser(user.id);
+    setEditFormData({ ...user });
+  };
+
+  const handleEditChange = (field, value) => {
+    setEditFormData({
+      ...editFormData,
+      [field]: value
+    });
+  };
+
+  const handleToggleAttendance = (day) => {
+    setEditFormData({
+      ...editFormData,
+      [day]: !editFormData[day]
+    });
+  };
+
+  const handleSaveEdit = async () => {
+    try {
+      const userRef = doc(db, "registration", editingUser);
+      await updateDoc(userRef, {
+        name: editFormData.name,
+        mobile: editFormData.mobile,
+        designation: editFormData.designation,
+        zone: editFormData.zone,
+        day1Attendance: editFormData.day1Attendance,
+        day2Attendance: editFormData.day2Attendance
+      });
+      setEditingUser(null);
+      setEditFormData({});
+      Swal.fire({
+        title: 'Success!',
+        text: 'User data updated successfully!',
+        icon: 'success',
+        timer: 1500,
+        showConfirmButton: false,
+        background: '#fff',
+        color: '#333'
+      });
+    } catch (error) {
+      console.error("Error updating user:", error);
+      Swal.fire({
+        title: 'Error!',
+        text: 'Error updating user data. Please try again.',
+        icon: 'error',
+        confirmButtonColor: '#3085d6',
+        background: '#fff',
+        color: '#333'
+      });
+    }
+  };
+
+  const handleDeleteClick = async (userId, userName) => {
+    const result = await Swal.fire({
+      title: 'Delete User?',
+      text: `Are you sure you want to delete ${userName}? This action cannot be undone!`,
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#d33',
+      cancelButtonColor: '#3085d6',
+      confirmButtonText: 'Yes, delete!',
+      cancelButtonText: 'Cancel',
+      background: '#fff',
+      color: '#333'
+    });
+
+    if (result.isConfirmed) {
+      try {
+        await deleteDoc(doc(db, "registration", userId));
+        Swal.fire({
+          title: 'Deleted!',
+          text: 'User has been deleted successfully.',
+          icon: 'success',
+          timer: 1500,
+          showConfirmButton: false,
+          background: '#fff',
+          color: '#333'
+        });
+      } catch (error) {
+        console.error("Error deleting user:", error);
+        Swal.fire({
+          title: 'Error!',
+          text: 'Error deleting user. Please try again.',
+          icon: 'error',
+          confirmButtonColor: '#3085d6',
+          background: '#fff',
+          color: '#333'
+        });
+      }
+    }
+  };
+
   const stats = {
     totalRegistered: registeredUsers.length,
     day1Attendance: registeredUsers.filter((u) => u.day1Attendance).length,
@@ -199,11 +300,28 @@ export default function AdminDashboard() {
     });
   };
 
+  const getFilteredDataForReport = () => {
+    let data = filteredUsers;
+
+    if (reportFilter === "day1") {
+      data = data.filter(u => u.day1Attendance);
+    } else if (reportFilter === "day2") {
+      data = data.filter(u => u.day2Attendance);
+    } else if (reportFilter === "both") {
+      data = data.filter(u => u.day1Attendance && u.day2Attendance);
+    } else if (reportFilter === "none") {
+      data = data.filter(u => !u.day1Attendance && !u.day2Attendance);
+    }
+
+    return data;
+  };
+
   const generatePDFReport = () => {
     showLoadingAlert('Generating PDF Report');
     
     setTimeout(() => {
       try {
+        const reportData = getFilteredDataForReport();
         const doc = new jsPDF("p", "mm", "a4");
         let yPosition = 20;
 
@@ -213,8 +331,13 @@ export default function AdminDashboard() {
         doc.text("Ahibba Summit 2025 - Registration Details", 14, yPosition);
         yPosition += 12;
 
-        // Date
+        // Filter info
         doc.setFontSize(10);
+        let filterInfo = "Filter: ";
+        if (zoneFilter) filterInfo += `Zone: ${zoneFilter}, `;
+        if (reportFilter !== "all") filterInfo += `Attendance: ${reportFilter}`;
+        doc.text(filterInfo, 14, yPosition);
+        yPosition += 6;
         doc.text(`Generated: ${new Date().toLocaleDateString()}`, 14, yPosition);
         yPosition += 8;
 
@@ -226,13 +349,11 @@ export default function AdminDashboard() {
 
         doc.setFont(undefined, "normal");
         doc.setFontSize(10);
-        doc.text(`Total Registered: ${stats.totalRegistered}`, 14, yPosition);
+        doc.text(`Total Records: ${reportData.length}`, 14, yPosition);
         yPosition += 6;
-        doc.text(`Day 1 Attendance: ${stats.day1Attendance}`, 14, yPosition);
+        doc.text(`Day 1 Attendance: ${reportData.filter(u => u.day1Attendance).length}`, 14, yPosition);
         yPosition += 6;
-        doc.text(`Day 2 Attendance: ${stats.day2Attendance}`, 14, yPosition);
-        yPosition += 6;
-        doc.text(`Both Days: ${stats.bothDays}`, 14, yPosition);
+        doc.text(`Day 2 Attendance: ${reportData.filter(u => u.day2Attendance).length}`, 14, yPosition);
         yPosition += 12;
 
         // Registration Details Table
@@ -253,7 +374,7 @@ export default function AdminDashboard() {
         doc.setFont(undefined, "normal");
         doc.setFontSize(8);
 
-        filteredUsers.forEach((user, idx) => {
+        reportData.forEach((user) => {
           if (yPosition > 270) {
             doc.addPage();
             yPosition = 20;
@@ -296,11 +417,104 @@ export default function AdminDashboard() {
     }, 1000);
   };
 
+  const generateZoneWisePDF = () => {
+    showLoadingAlert('Generating Zone-wise PDF Report');
+    
+    setTimeout(() => {
+      try {
+        const doc = new jsPDF("p", "mm", "a4");
+        let yPosition = 20;
+
+        // Title
+        doc.setFontSize(18);
+        doc.setTextColor(0, 0, 0);
+        doc.text("Ahibba Summit 2025 - Zone-wise Analysis", 14, yPosition);
+        yPosition += 12;
+
+        doc.setFontSize(10);
+        doc.text(`Generated: ${new Date().toLocaleDateString()}`, 14, yPosition);
+        yPosition += 10;
+
+        // Zone Statistics Table
+        doc.setFont(undefined, "bold");
+        doc.setFontSize(10);
+        
+        // Headers
+        doc.rect(14, yPosition - 5, 182, 7, "S");
+        doc.text("Zone", 20, yPosition);
+        doc.text("Registered", 80, yPosition);
+        doc.text("Day 1", 120, yPosition);
+        doc.text("Day 2", 150, yPosition);
+        doc.text("Both Days", 180, yPosition);
+        yPosition += 10;
+
+        // Data rows
+        doc.setFont(undefined, "normal");
+        doc.setFontSize(9);
+
+        zoneStats.forEach((stat) => {
+          if (yPosition > 270) {
+            doc.addPage();
+            yPosition = 20;
+            
+            // Redraw headers
+            doc.setFont(undefined, "bold");
+            doc.setFontSize(10);
+            doc.rect(14, yPosition - 5, 182, 7, "S");
+            doc.text("Zone", 20, yPosition);
+            doc.text("Registered", 80, yPosition);
+            doc.text("Day 1", 120, yPosition);
+            doc.text("Day 2", 150, yPosition);
+            doc.text("Both Days", 180, yPosition);
+            yPosition += 10;
+            doc.setFont(undefined, "normal");
+            doc.setFontSize(9);
+          }
+
+          const bothDays = stat.registered - (stat.registered - (stat.day1 > stat.day2 ? stat.day1 : stat.day2));
+          
+          doc.text(stat.zone, 20, yPosition);
+          doc.text(stat.registered.toString(), 80, yPosition);
+          doc.text(stat.day1.toString(), 120, yPosition);
+          doc.text(stat.day2.toString(), 150, yPosition);
+          doc.text(registeredUsers.filter(u => u.zone === stat.zone && u.day1Attendance && u.day2Attendance).length.toString(), 180, yPosition);
+          
+          doc.setDrawColor(200, 200, 200);
+          doc.line(14, yPosition + 1, 196, yPosition + 1);
+          yPosition += 7;
+        });
+
+        doc.save("Ahibba_Zone_wise_Analysis.pdf");
+        
+        Swal.fire({
+          title: 'Success!',
+          text: 'Zone-wise PDF report downloaded successfully!',
+          icon: 'success',
+          timer: 2000,
+          showConfirmButton: false,
+          background: '#fff',
+          color: '#333'
+        });
+      } catch (error) {
+        console.error("Error generating PDF:", error);
+        Swal.fire({
+          title: 'Error!',
+          text: `Error generating PDF: ${error.message}`,
+          icon: 'error',
+          confirmButtonColor: '#3085d6',
+          background: '#fff',
+          color: '#333'
+        });
+      }
+    }, 1000);
+  };
+
   const generateDetailedPDF = () => {
     showLoadingAlert('Generating Detailed PDF');
     
     setTimeout(() => {
       try {
+        const reportData = getFilteredDataForReport();
         const doc = new jsPDF("p", "mm", "a4");
         let yPosition = 20;
 
@@ -314,7 +528,7 @@ export default function AdminDashboard() {
         doc.setFontSize(10);
         doc.text(`Generated: ${new Date().toLocaleDateString()}`, 14, yPosition);
         yPosition += 5;
-        doc.text(`Total Records: ${filteredUsers.length}`, 14, yPosition);
+        doc.text(`Total Records: ${reportData.length}`, 14, yPosition);
         yPosition += 10;
 
         // Detailed table
@@ -348,7 +562,7 @@ export default function AdminDashboard() {
         doc.setFont(undefined, "normal");
         doc.setFontSize(7);
 
-        filteredUsers.forEach((user, index) => {
+        reportData.forEach((user) => {
           if (yPosition > 280) {
             doc.addPage();
             yPosition = 20;
@@ -418,13 +632,14 @@ export default function AdminDashboard() {
     
     setTimeout(() => {
       try {
+        const reportData = getFilteredDataForReport();
         // Create CSV headers
         const headers = ['Name', 'Mobile Number', 'Designation', 'Zone', 'Day 1 Attendance', 'Day 2 Attendance', 'Registration Date'];
         
         // Create CSV rows
         const csvRows = [
           headers,
-          ...filteredUsers.map(user => [
+          ...reportData.map(user => [
             `"${(user.name || 'N/A').replace(/"/g, '""')}"`,
             `"${(user.mobile || 'N/A').replace(/"/g, '""')}"`,
             `"${(user.designation || 'N/A').replace(/"/g, '""')}"`,
@@ -475,19 +690,20 @@ export default function AdminDashboard() {
     
     setTimeout(() => {
       try {
+        const reportData = getFilteredDataForReport();
         let textContent = `AHIBBA SUMMIT 2025 - REGISTRATION REPORT\n`;
         textContent += `Generated: ${new Date().toLocaleDateString()}\n`;
-        textContent += `Total Records: ${filteredUsers.length}\n\n`;
+        textContent += `Total Records: ${reportData.length}\n\n`;
         textContent += `SUMMARY:\n`;
-        textContent += `Total Registered: ${stats.totalRegistered}\n`;
-        textContent += `Day 1 Attendance: ${stats.day1Attendance}\n`;
-        textContent += `Day 2 Attendance: ${stats.day2Attendance}\n`;
-        textContent += `Both Days: ${stats.bothDays}\n\n`;
+        textContent += `Total Records in Report: ${reportData.length}\n`;
+        textContent += `Day 1 Attendance: ${reportData.filter(u => u.day1Attendance).length}\n`;
+        textContent += `Day 2 Attendance: ${reportData.filter(u => u.day2Attendance).length}\n`;
+        textContent += `Both Days: ${reportData.filter(u => u.day1Attendance && u.day2Attendance).length}\n\n`;
         textContent += `DETAILED REGISTRATION:\n`;
         textContent += `Name\tMobile\tDesignation\tZone\tDay1\tDay2\n`;
         textContent += `----\t------\t-----------\t----\t----\t----\n`;
         
-        filteredUsers.forEach(user => {
+        reportData.forEach(user => {
           textContent += `${user.name || 'N/A'}\t`;
           textContent += `${user.mobile || 'N/A'}\t`;
           textContent += `${user.designation || 'N/A'}\t`;
@@ -748,7 +964,7 @@ export default function AdminDashboard() {
           </div>
         </motion.div>
 
-        {/* Report Generation */}
+        {/* Report Generation with Filters */}
         <motion.div
           initial={{ y: 20, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
@@ -758,31 +974,54 @@ export default function AdminDashboard() {
             <FiDownload className="text-xl text-purple-600" />
             <h3 className="text-lg font-semibold text-gray-800">Generate Reports</h3>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          
+          <div className="mb-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
+            <label className="block text-sm font-medium text-gray-700 mb-2">Report Filter</label>
+            <select
+              value={reportFilter}
+              onChange={(e) => setReportFilter(e.target.value)}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
+            >
+              <option value="all">All Users</option>
+              <option value="day1">Day 1 Attended Only</option>
+              <option value="day2">Day 2 Attended Only</option>
+              <option value="both">Both Days Attended</option>
+              <option value="none">Not Attended</option>
+            </select>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
             <button
               onClick={generatePDFReport}
-              className="bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text-white font-semibold py-4 px-4 rounded-xl shadow-md transition-all transform hover:scale-105 flex flex-col items-center"
+              className="bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text-white font-semibold py-4 px-4 rounded-xl shadow-md transition-all transform hover:scale-105 flex flex-col items-center text-sm"
             >
               <FiFileText className="text-2xl mb-2" />
               <span>PDF Report</span>
             </button>
             <button
               onClick={generateDetailedPDF}
-              className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-semibold py-4 px-4 rounded-xl shadow-md transition-all transform hover:scale-105 flex flex-col items-center"
+              className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-semibold py-4 px-4 rounded-xl shadow-md transition-all transform hover:scale-105 flex flex-col items-center text-sm"
             >
               <FiFilePlus className="text-2xl mb-2" />
               <span>Detailed PDF</span>
             </button>
             <button
+              onClick={generateZoneWisePDF}
+              className="bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-700 hover:to-indigo-800 text-white font-semibold py-4 px-4 rounded-xl shadow-md transition-all transform hover:scale-105 flex flex-col items-center text-sm"
+            >
+              <FiMapPin className="text-2xl mb-2" />
+              <span>Zone-wise PDF</span>
+            </button>
+            <button
               onClick={generateCSVReport}
-              className="bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white font-semibold py-4 px-4 rounded-xl shadow-md transition-all transform hover:scale-105 flex flex-col items-center"
+              className="bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white font-semibold py-4 px-4 rounded-xl shadow-md transition-all transform hover:scale-105 flex flex-col items-center text-sm"
             >
               <FiFile className="text-2xl mb-2" />
               <span>CSV Export</span>
             </button>
             <button
               onClick={generateTextReport}
-              className="bg-gradient-to-r from-orange-600 to-orange-700 hover:from-orange-700 hover:to-orange-800 text-white font-semibold py-4 px-4 rounded-xl shadow-md transition-all transform hover:scale-105 flex flex-col items-center"
+              className="bg-gradient-to-r from-orange-600 to-orange-700 hover:from-orange-700 hover:to-orange-800 text-white font-semibold py-4 px-4 rounded-xl shadow-md transition-all transform hover:scale-105 flex flex-col items-center text-sm"
             >
               <FiPrinter className="text-2xl mb-2" />
               <span>Text Report</span>
@@ -855,6 +1094,113 @@ export default function AdminDashboard() {
           </div>
         </motion.div>
 
+        {/* Edit User Modal */}
+        {editingUser && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              className="bg-white p-8 rounded-xl shadow-2xl max-w-md w-full"
+            >
+              <div className="flex justify-between items-center mb-6">
+                <h2 className="text-2xl font-bold text-gray-800 flex items-center space-x-2">
+                  <FiEdit2 />
+                  <span>Edit User</span>
+                </h2>
+                <button
+                  onClick={() => setEditingUser(null)}
+                  className="text-gray-500 hover:text-gray-700"
+                >
+                  <FiX className="text-2xl" />
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Name</label>
+                  <input
+                    type="text"
+                    value={editFormData.name || ""}
+                    onChange={(e) => handleEditChange("name", e.target.value)}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Mobile</label>
+                  <input
+                    type="text"
+                    value={editFormData.mobile || ""}
+                    onChange={(e) => handleEditChange("mobile", e.target.value)}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Designation</label>
+                  <input
+                    type="text"
+                    value={editFormData.designation || ""}
+                    onChange={(e) => handleEditChange("designation", e.target.value)}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Zone</label>
+                  <select
+                    value={editFormData.zone || ""}
+                    onChange={(e) => handleEditChange("zone", e.target.value)}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  >
+                    <option value="">Select Zone</option>
+                    {ZONES.map((zone) => (
+                      <option key={zone} value={zone}>{zone}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="flex space-x-4">
+                  <label className="flex items-center space-x-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={editFormData.day1Attendance || false}
+                      onChange={() => handleToggleAttendance("day1Attendance")}
+                      className="rounded"
+                    />
+                    <span className="text-sm font-medium text-gray-700">Day 1 Attended</span>
+                  </label>
+                  <label className="flex items-center space-x-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={editFormData.day2Attendance || false}
+                      onChange={() => handleToggleAttendance("day2Attendance")}
+                      className="rounded"
+                    />
+                    <span className="text-sm font-medium text-gray-700">Day 2 Attended</span>
+                  </label>
+                </div>
+
+                <div className="flex space-x-3 pt-4">
+                  <button
+                    onClick={handleSaveEdit}
+                    className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors flex items-center justify-center space-x-2"
+                  >
+                    <FiSave />
+                    <span>Save Changes</span>
+                  </button>
+                  <button
+                    onClick={() => setEditingUser(null)}
+                    className="flex-1 bg-gray-300 hover:bg-gray-400 text-gray-800 font-semibold py-2 px-4 rounded-lg transition-colors"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+
         {/* Users Table */}
         <motion.div
           initial={{ y: 20, opacity: 0 }}
@@ -894,6 +1240,9 @@ export default function AdminDashboard() {
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Day 2
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Actions
                   </th>
                 </tr>
               </thead>
@@ -935,11 +1284,27 @@ export default function AdminDashboard() {
                           </span>
                         )}
                       </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-center space-x-2 flex">
+                        <button
+                          onClick={() => handleEditClick(user)}
+                          className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded-lg transition-colors flex items-center space-x-1"
+                        >
+                          <FiEdit2 className="text-sm" />
+                          <span>Edit</span>
+                        </button>
+                        <button
+                          onClick={() => handleDeleteClick(user.id, user.name)}
+                          className="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded-lg transition-colors flex items-center space-x-1"
+                        >
+                          <FiTrash2 className="text-sm" />
+                          <span>Delete</span>
+                        </button>
+                      </td>
                     </tr>
                   ))
                 ) : (
                   <tr>
-                    <td colSpan="6" className="px-6 py-8 text-center">
+                    <td colSpan="7" className="px-6 py-8 text-center">
                       <div className="flex flex-col items-center justify-center text-gray-500">
                         <FiUsers className="text-4xl mb-2 text-gray-300" />
                         <p className="text-lg font-medium">No users found</p>
