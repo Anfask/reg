@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { motion } from "framer-motion";
 import { collection, query, where, getDocs, updateDoc, doc } from "firebase/firestore";
 import { db } from "../config/firebase";
@@ -10,12 +10,85 @@ export default function AttendancePage() {
   const [message, setMessage] = useState("");
   const [searchPerformed, setSearchPerformed] = useState(false);
   const [day, setDay] = useState("");
+  const canvasRef = useRef(null);
 
   // Check if Day 2 is unlocked (October 26, 2025, 12:00 AM IST)
   const isDay2Unlocked = () => {
     const now = new Date();
     const unlockDate = new Date('2025-10-26T00:00:00+05:30'); // IST timezone
     return now >= unlockDate;
+  };
+
+  // Confetti animation function
+  const createConfetti = () => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const ctx = canvas.getContext('2d');
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+
+    const confetti = [];
+    const confettiCount = 100;
+
+    for (let i = 0; i < confettiCount; i++) {
+      confetti.push({
+        x: Math.random() * canvas.width,
+        y: Math.random() * canvas.height - canvas.height,
+        size: Math.random() * 5 + 2,
+        speedX: Math.random() * 4 - 2,
+        speedY: Math.random() * 5 + 5,
+        color: ['#FFD700', '#FF6B6B', '#4ECDC4', '#45B7D1', '#FFA07A'][Math.floor(Math.random() * 5)],
+        rotation: Math.random() * Math.PI * 2
+      });
+    }
+
+    const animate = () => {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      
+      confetti.forEach((piece, index) => {
+        piece.y += piece.speedY;
+        piece.x += piece.speedX;
+        piece.rotation += 0.1;
+
+        if (piece.y > canvas.height) {
+          confetti.splice(index, 1);
+        }
+
+        ctx.save();
+        ctx.translate(piece.x, piece.y);
+        ctx.rotate(piece.rotation);
+        ctx.fillStyle = piece.color;
+        ctx.fillRect(-piece.size / 2, -piece.size / 2, piece.size, piece.size);
+        ctx.restore();
+      });
+
+      if (confetti.length > 0) {
+        requestAnimationFrame(animate);
+      }
+    };
+
+    animate();
+  };
+
+  // Voice function
+  const playWelcomeVoice = (name) => {
+    const text = `Welcome Back ${name} to the Ahibba Summit 2025! We are delighted to have you here. Enjoy the event and make the most of this incredible experience!`;
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = 'en-IN';
+    utterance.rate = 0.8;
+    utterance.pitch = 0.8;
+    utterance.volume = 1;
+
+    // Set voice to Indian male English if available
+    const voices = window.speechSynthesis.getVoices();
+    const indianVoice = voices.find(v => v.lang.includes('en-IN')) || voices.find(v => v.lang.includes('en'));
+    if (indianVoice) {
+      utterance.voice = indianVoice;
+    }
+
+    window.speechSynthesis.cancel();
+    window.speechSynthesis.speak(utterance);
   };
 
   const handleSearch = async (e) => {
@@ -71,6 +144,12 @@ export default function AttendancePage() {
         [`${attendanceField}Time`]: new Date()
       });
 
+      // Trigger voice and confetti for Day 1
+      if (day === "1") {
+        playWelcomeVoice(userData.name);
+        createConfetti();
+      }
+
       setMessage(`Day ${day} attendance marked successfully!`);
       setUserData(prev => ({
         ...prev,
@@ -109,6 +188,12 @@ export default function AttendancePage() {
         backgroundRepeat: 'no-repeat'
       }}
     >
+      {/* Confetti Canvas */}
+      <canvas 
+        ref={canvasRef} 
+        className="fixed inset-0 pointer-events-none z-50"
+      />
+
       {/* Overlay for better text readability */}
       <div className="absolute inset-0 bg-black opacity-50"></div>
       
