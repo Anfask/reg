@@ -14,6 +14,44 @@ export default function CertificatePage() {
   const [downloading, setDownloading] = useState(false);
   const certificateRef = useRef(null);
 
+  // Check if user has completed all attendance requirements
+  const hasCompletedAllRequirements = (user) => {
+    // Must have attended both days
+    if (!user.day1Attendance || !user.day2Attendance) {
+      return false;
+    }
+
+    // Must have specific schedule marked for both days
+    if (!user.day1Schedule || !user.day2Schedule) {
+      return false;
+    }
+
+    // Both schedule fields should not be empty
+    if (user.day1Schedule.trim() === "" || user.day2Schedule.trim() === "") {
+      return false;
+    }
+
+    return true;
+  };
+
+  // Get schedule display text
+  const getScheduleDisplay = (dayNum, scheduleType) => {
+    const day1Schedules = {
+      morning: "Morning 10:00 AM",
+      afternoon: "Afternoon 2:30 PM", 
+      evening: "Evening 6:20 PM"
+    };
+    
+    const day2Schedules = {
+      morning: "Morning 8:30 AM",
+      afternoon: "Afternoon 2:30 PM",
+      evening: "Evening 7:00 PM"
+    };
+    
+    const schedule = dayNum === "1" ? day1Schedules : day2Schedules;
+    return schedule[scheduleType] || scheduleType || "Not Marked";
+  };
+
   const handleSearch = async (e) => {
     e.preventDefault();
 
@@ -31,19 +69,35 @@ export default function CertificatePage() {
       const snapshot = await getDocs(q);
 
       if (snapshot.empty) {
-        setMessage("User not found or not registered for the event.");
+        setMessage("User not found. Please check the mobile number.");
         setSearchPerformed(true);
       } else {
         const user = snapshot.docs[0].data();
+        user.id = snapshot.docs[0].id;
         
-        if (!user.day1Attendance && !user.day2Attendance) {
-          setMessage("User has not marked attendance for any day. Certificate cannot be issued.");
+        // Check if user has completed all attendance requirements
+        if (hasCompletedAllRequirements(user)) {
+          setUserData(user);
+          setMessage("Certificate is available for download!");
           setSearchPerformed(true);
         } else {
-          user.id = snapshot.docs[0].id;
-          setUserData(user);
+          setUserData(user); // Still set user data to show details
           setSearchPerformed(true);
-          setMessage("");
+          
+          // Provide specific feedback on what's missing
+          if (!user.day1Attendance && !user.day2Attendance) {
+            setMessage("❌ Certificate not available. You need to mark attendance for both Day 1 and Day 2.");
+          } else if (!user.day1Attendance) {
+            setMessage("❌ Certificate not available. You need to mark Day 1 attendance.");
+          } else if (!user.day2Attendance) {
+            setMessage("❌ Certificate not available. You need to mark Day 2 attendance.");
+          } else if (!user.day1Schedule || user.day1Schedule.trim() === "") {
+            setMessage("❌ Certificate not available. Day 1 schedule attendance not properly marked.");
+          } else if (!user.day2Schedule || user.day2Schedule.trim() === "") {
+            setMessage("❌ Certificate not available. Day 2 schedule attendance not properly marked.");
+          } else {
+            setMessage("❌ Certificate not available. Attendance requirements not fully completed.");
+          }
         }
       }
     } catch (error) {
@@ -56,7 +110,7 @@ export default function CertificatePage() {
   };
 
   const downloadCertificate = async () => {
-    if (!certificateRef.current) return;
+    if (!certificateRef.current || !hasCompletedAllRequirements(userData)) return;
 
     setDownloading(true);
 
@@ -102,9 +156,31 @@ export default function CertificatePage() {
     }
   };
 
-  const attendedDays = [];
-  if (userData?.day1Attendance) attendedDays.push("Day 1");
-  if (userData?.day2Attendance) attendedDays.push("Day 2");
+  // Check if certificate is available for download
+  const isCertificateAvailable = userData && hasCompletedAllRequirements(userData);
+
+  // Get attendance status details
+  const getAttendanceStatus = (user) => {
+    const status = [];
+    
+    if (user.day1Attendance && user.day1Schedule) {
+      status.push(`✓ Day 1: ${getScheduleDisplay("1", user.day1Schedule)}`);
+    } else if (user.day1Attendance) {
+      status.push("⚠️ Day 1: Attendance marked but schedule incomplete");
+    } else {
+      status.push("❌ Day 1: Not attended");
+    }
+    
+    if (user.day2Attendance && user.day2Schedule) {
+      status.push(`✓ Day 2: ${getScheduleDisplay("2", user.day2Schedule)}`);
+    } else if (user.day2Attendance) {
+      status.push("⚠️ Day 2: Attendance marked but schedule incomplete");
+    } else {
+      status.push("❌ Day 2: Not attended");
+    }
+    
+    return status;
+  };
 
   return (
     <div 
@@ -136,13 +212,17 @@ export default function CertificatePage() {
         >
           <div className="text-center mb-8">
             <h3 className="text-2xl font-bold text-yellow-500">Get Your Certificate</h3>
-            <p className="text-white-600 mt-2 text-sm">Enter your mobile number to retrieve your participation certificate</p>
+            <p className="text-white-600 mt-2 text-sm">
+              Enter your mobile number to retrieve your participation certificate
+            </p>
           </div>
 
           {message && (
             <div className={`mb-4 p-3 rounded-lg text-sm font-medium ${
-              message.includes("not found") || message.includes("cannot be issued") || message.includes("Error")
+              message.includes("❌") || message.includes("not available") || message.includes("Error")
                 ? "bg-red-100 text-red-700 border border-red-300"
+                : message.includes("⚠️")
+                ? "bg-yellow-100 text-yellow-700 border border-yellow-300"
                 : "bg-green-100 text-green-700 border border-green-300"
             }`}>
               {message}
@@ -181,7 +261,7 @@ export default function CertificatePage() {
                     <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                     </svg>
-                    Get Certificate
+                    Check Certificate Eligibility
                   </>
                 )}
               </button>
@@ -192,36 +272,71 @@ export default function CertificatePage() {
               animate={{ scale: 1, opacity: 1 }}
               className="space-y-4"
             >
-              <div className="bg-purple-50 p-4 rounded-lg border border-purple-200">
+              <div className={`p-4 rounded-lg border ${
+                isCertificateAvailable 
+                  ? "bg-green-50 border-green-200" 
+                  : "bg-yellow-50 border-yellow-200"
+              }`}>
                 <p className="text-sm font-medium text-gray-700 mb-2">Participant Details:</p>
-                <div className="space-y-1 text-sm">
+                <div className="space-y-2 text-sm">
                   <p><span className="font-semibold text-gray-800">{userData.name}</span></p>
                   <p className="text-gray-600">Mobile: {userData.mobile}</p>
                   <p className="text-gray-600">Designation: {userData.designation}</p>
                   <p className="text-gray-600">Zone: {userData.zone}</p>
-                  <p className="text-green-700 font-semibold mt-2">Attended: {attendedDays.join(" & ")}</p>
+                  
+                  <div className="mt-3 pt-2 border-t border-gray-200">
+                    <p className="font-medium text-gray-700 mb-1">Attendance Status:</p>
+                    {getAttendanceStatus(userData).map((status, index) => (
+                      <p 
+                        key={index} 
+                        className={`text-sm ${
+                          status.includes('✓') ? 'text-green-700' : 
+                          status.includes('⚠️') ? 'text-yellow-700' : 
+                          'text-red-700'
+                        }`}
+                      >
+                        {status}
+                      </p>
+                    ))}
+                  </div>
+
+                  {isCertificateAvailable && (
+                    <div className="mt-2 p-2 bg-green-100 rounded border border-green-300">
+                      <p className="text-green-800 font-semibold text-sm">
+                        ✅ Eligible for Certificate! You have completed all attendance requirements.
+                      </p>
+                    </div>
+                  )}
                 </div>
               </div>
 
-              <button
-                onClick={downloadCertificate}
-                disabled={downloading}
-                className="w-full px-6 py-3 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 disabled:from-gray-400 disabled:to-gray-500 text-white font-semibold rounded-lg shadow-md transition-all transform hover:scale-105 disabled:transform-none flex items-center justify-center"
-              >
-                {downloading ? (
-                  <>
-                    <div className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent mr-2"></div>
-                    Generating PDF...
-                  </>
-                ) : (
-                  <>
-                    <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                    </svg>
-                    Download Certificate (PDF)
-                  </>
-                )}
-              </button>
+              {isCertificateAvailable ? (
+                <button
+                  onClick={downloadCertificate}
+                  disabled={downloading}
+                  className="w-full px-6 py-3 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 disabled:from-gray-400 disabled:to-gray-500 text-white font-semibold rounded-lg shadow-md transition-all transform hover:scale-105 disabled:transform-none flex items-center justify-center"
+                >
+                  {downloading ? (
+                    <>
+                      <div className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent mr-2"></div>
+                      Generating PDF...
+                    </>
+                  ) : (
+                    <>
+                      <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                      </svg>
+                      Download Certificate (PDF)
+                    </>
+                  )}
+                </button>
+              ) : (
+                <div className="text-center p-3 bg-gray-100 rounded-lg border border-gray-300">
+                  <p className="text-sm text-gray-600">
+                    Complete attendance on both days to unlock your certificate
+                  </p>
+                </div>
+              )}
 
               <button
                 onClick={() => {
@@ -238,7 +353,7 @@ export default function CertificatePage() {
           )}
         </motion.div>
 
-        {userData && (
+        {isCertificateAvailable && (
           <motion.div
             initial={{ scale: 0.8, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
