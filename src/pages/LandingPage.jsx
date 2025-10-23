@@ -28,7 +28,7 @@ export default function LandingPage() {
     "Maharashta",
     "PR Department",
     "Academia Department",
-    "Directoroate",
+    "Directorate",
     "Not Applicable"
   ];
 
@@ -37,7 +37,7 @@ export default function LandingPage() {
     zone !== "Not Applicable" && 
     zone !== "PR Department" && 
     zone !== "Academia Department" && 
-    zone !== "Directoroate"
+    zone !== "Directorate"
   );
 
   const handleInputChange = (e) => {
