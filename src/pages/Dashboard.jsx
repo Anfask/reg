@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { collection, onSnapshot, doc, updateDoc, deleteDoc } from "firebase/firestore";
+import { collection, onSnapshot, doc, updateDoc, deleteDoc, query, where, getDocs } from "firebase/firestore";
 import { getAuth, signOut } from "firebase/auth";
 import { db } from "../config/firebase";
 import { BarChart, XAxis, YAxis, CartesianGrid, Tooltip, Bar, PieChart, Pie, Cell, ResponsiveContainer } from "recharts";
@@ -58,15 +58,15 @@ const ZONES = [
 
 // Schedule configurations matching the attendance page
 const day1Schedule = {
-  morning: { display: "Morning 10:00 AM" },
-  afternoon: { display: "Afternoon 2:30 PM" },
-  evening: { display: "Evening 6:20 PM" }
+  morning: { display: "Morning 10:00 AM", time: "10:00 AM" },
+  afternoon: { display: "Afternoon 2:30 PM", time: "2:30 PM" },
+  evening: { display: "Evening 6:20 PM", time: "6:20 PM" }
 };
 
 const day2Schedule = {
-  morning: { display: "Morning 8:30 AM" },
-  afternoon: { display: "Afternoon 2:30 PM" },
-  evening: { display: "Evening 7:00 PM" }
+  morning: { display: "Morning 8:30 AM", time: "8:30 AM" },
+  afternoon: { display: "Afternoon 2:30 PM", time: "2:30 PM" },
+  evening: { display: "Evening 7:00 PM", time: "7:00 PM" }
 };
 
 // Helper function to format Firebase timestamp
@@ -111,6 +111,12 @@ const getScheduleDisplay = (dayNum, scheduleType) => {
   return schedule[scheduleType]?.display || scheduleType || "Not Marked";
 };
 
+// Helper function to get schedule time
+const getScheduleTime = (dayNum, scheduleType) => {
+  const schedule = dayNum === "1" ? day1Schedule : day2Schedule;
+  return schedule[scheduleType]?.time || "";
+};
+
 // Helper function to get date only for sorting/grouping
 const getDateOnly = (timestamp) => {
   if (!timestamp) return new Date(0);
@@ -141,6 +147,7 @@ export default function AdminDashboard() {
   const [editFormData, setEditFormData] = useState({});
   const [reportFilter, setReportFilter] = useState("all");
   const [reportZoneFilter, setReportZoneFilter] = useState("");
+  const [scheduleFilter, setScheduleFilter] = useState({ day1: "", day2: "" });
 
   useEffect(() => {
     const unsubscribe = onSnapshot(collection(db, "registration"), (snapshot) => {
@@ -154,13 +161,13 @@ export default function AdminDashboard() {
       });
       
       setRegisteredUsers(sortedData);
-      filterUsers(sortedData, searchQuery, zoneFilter, attendanceFilter);
+      filterUsers(sortedData, searchQuery, zoneFilter, attendanceFilter, scheduleFilter);
       setLoading(false);
     });
     return () => unsubscribe();
   }, []);
 
-  const filterUsers = (users, search, zone, attendance) => {
+  const filterUsers = (users, search, zone, attendance, schedule) => {
     let filtered = users;
 
     if (search.trim()) {
@@ -186,25 +193,40 @@ export default function AdminDashboard() {
       filtered = filtered.filter((u) => !u.day1Attendance && !u.day2Attendance);
     }
 
+    // Apply schedule filters
+    if (schedule.day1) {
+      filtered = filtered.filter((u) => u.day1Schedule === schedule.day1);
+    }
+    if (schedule.day2) {
+      filtered = filtered.filter((u) => u.day2Schedule === schedule.day2);
+    }
+
     setFilteredUsers(filtered);
   };
 
   const handleSearchChange = (e) => {
     const query = e.target.value;
     setSearchQuery(query);
-    filterUsers(registeredUsers, query, zoneFilter, attendanceFilter);
+    filterUsers(registeredUsers, query, zoneFilter, attendanceFilter, scheduleFilter);
   };
 
   const handleZoneFilter = (e) => {
     const zone = e.target.value;
     setZoneFilter(zone);
-    filterUsers(registeredUsers, searchQuery, zone, attendanceFilter);
+    filterUsers(registeredUsers, searchQuery, zone, attendanceFilter, scheduleFilter);
   };
 
   const handleAttendanceFilter = (e) => {
     const attendance = e.target.value;
     setAttendanceFilter(attendance);
-    filterUsers(registeredUsers, searchQuery, zoneFilter, attendance);
+    filterUsers(registeredUsers, searchQuery, zoneFilter, attendance, scheduleFilter);
+  };
+
+  const handleScheduleFilter = (day, scheduleType) => {
+    const newScheduleFilter = { ...scheduleFilter };
+    newScheduleFilter[day] = scheduleType === "all" ? "" : scheduleType;
+    setScheduleFilter(newScheduleFilter);
+    filterUsers(registeredUsers, searchQuery, zoneFilter, attendanceFilter, newScheduleFilter);
   };
 
   const handleLogout = async () => {
@@ -313,7 +335,8 @@ export default function AdminDashboard() {
         day1Attendance: editFormData.day1Attendance,
         day1Schedule: editFormData.day1Schedule,
         day2Attendance: editFormData.day2Attendance,
-        day2Schedule: editFormData.day2Schedule
+        day2Schedule: editFormData.day2Schedule,
+        lastUpdated: new Date()
       });
       setEditingUser(null);
       setEditFormData({});
@@ -569,7 +592,113 @@ export default function AdminDashboard() {
     }, 1000);
   };
 
-  // ... (other report generation functions remain similar but updated for schedules)
+  // Generate Schedule-wise Report
+  const generateScheduleReport = () => {
+    showLoadingAlert('Generating Schedule Report');
+    
+    setTimeout(() => {
+      try {
+        const doc = new jsPDF("p", "mm", "a4");
+        let yPosition = 20;
+
+        // Title
+        doc.setFontSize(18);
+        doc.setTextColor(0, 0, 0);
+        doc.text("Ahibba Summit 2025 - Schedule Attendance Report", 14, yPosition);
+        yPosition += 12;
+
+        // Summary Statistics
+        doc.setFontSize(12);
+        doc.setFont(undefined, "bold");
+        doc.text("Schedule Summary", 14, yPosition);
+        yPosition += 8;
+
+        doc.setFont(undefined, "normal");
+        doc.setFontSize(10);
+        
+        // Day 1 Schedule Summary
+        doc.text("Day 1 - October 25, 2025:", 14, yPosition);
+        yPosition += 6;
+        doc.text(`  Morning (10:00 AM): ${stats.day1Schedules.morning} attendees`, 16, yPosition);
+        yPosition += 5;
+        doc.text(`  Afternoon (2:30 PM): ${stats.day1Schedules.afternoon} attendees`, 16, yPosition);
+        yPosition += 5;
+        doc.text(`  Evening (6:20 PM): ${stats.day1Schedules.evening} attendees`, 16, yPosition);
+        yPosition += 8;
+
+        // Day 2 Schedule Summary
+        doc.text("Day 2 - October 26, 2025:", 14, yPosition);
+        yPosition += 6;
+        doc.text(`  Morning (8:30 AM): ${stats.day2Schedules.morning} attendees`, 16, yPosition);
+        yPosition += 5;
+        doc.text(`  Afternoon (2:30 PM): ${stats.day2Schedules.afternoon} attendees`, 16, yPosition);
+        yPosition += 5;
+        doc.text(`  Evening (7:00 PM): ${stats.day2Schedules.evening} attendees`, 16, yPosition);
+        yPosition += 12;
+
+        // Zone-wise Schedule Breakdown
+        doc.setFont(undefined, "bold");
+        doc.text("Zone-wise Schedule Attendance", 14, yPosition);
+        yPosition += 8;
+
+        ZONES.forEach(zone => {
+          if (yPosition > 270) {
+            doc.addPage();
+            yPosition = 20;
+          }
+
+          const zoneUsers = registeredUsers.filter(u => u.zone === zone);
+          if (zoneUsers.length > 0) {
+            doc.setFont(undefined, "bold");
+            doc.setFontSize(9);
+            doc.text(`${zone}: ${zoneUsers.length} registered`, 14, yPosition);
+            yPosition += 5;
+
+            doc.setFont(undefined, "normal");
+            doc.setFontSize(8);
+            
+            // Day 1 schedules for this zone
+            const day1Morning = zoneUsers.filter(u => u.day1Schedule === 'morning').length;
+            const day1Afternoon = zoneUsers.filter(u => u.day1Schedule === 'afternoon').length;
+            const day1Evening = zoneUsers.filter(u => u.day1Schedule === 'evening').length;
+            
+            doc.text(`  Day 1 - M: ${day1Morning}, A: ${day1Afternoon}, E: ${day1Evening}`, 16, yPosition);
+            yPosition += 4;
+
+            // Day 2 schedules for this zone
+            const day2Morning = zoneUsers.filter(u => u.day2Schedule === 'morning').length;
+            const day2Afternoon = zoneUsers.filter(u => u.day2Schedule === 'afternoon').length;
+            const day2Evening = zoneUsers.filter(u => u.day2Schedule === 'evening').length;
+            
+            doc.text(`  Day 2 - M: ${day2Morning}, A: ${day2Afternoon}, E: ${day2Evening}`, 16, yPosition);
+            yPosition += 8;
+          }
+        });
+
+        doc.save("Ahibba_Schedule_Report.pdf");
+        
+        Swal.fire({
+          title: 'Success!',
+          text: 'Schedule report downloaded successfully!',
+          icon: 'success',
+          timer: 2000,
+          showConfirmButton: false,
+          background: '#fff',
+          color: '#333'
+        });
+      } catch (error) {
+        console.error("Error generating schedule report:", error);
+        Swal.fire({
+          title: 'Error!',
+          text: `Error generating schedule report: ${error.message}`,
+          icon: 'error',
+          confirmButtonColor: '#3085d6',
+          background: '#fff',
+          color: '#333'
+        });
+      }
+    }, 1000);
+  };
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -693,6 +822,150 @@ export default function AdminDashboard() {
             </div>
           </motion.div>
         </div>
+
+        {/* Enhanced Filters Section */}
+        <motion.div
+          initial={{ y: 20, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          className="bg-white p-6 rounded-xl shadow-md mb-8 hover:shadow-lg transition-shadow"
+        >
+          <div className="flex items-center space-x-2 mb-4">
+            <FiFilter className="text-xl text-blue-600" />
+            <h3 className="text-lg font-semibold text-gray-800">Filters</h3>
+          </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+            {/* Search */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Search</label>
+              <div className="relative">
+                <FiSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+                <input
+                  type="text"
+                  placeholder="Search by name or mobile..."
+                  value={searchQuery}
+                  onChange={handleSearchChange}
+                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
+                />
+              </div>
+            </div>
+
+            {/* Zone Filter */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Zone</label>
+              <select
+                value={zoneFilter}
+                onChange={handleZoneFilter}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
+              >
+                <option value="">All Zones</option>
+                {ZONES.map((zone) => (
+                  <option key={zone} value={zone}>{zone}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Attendance Filter */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Attendance</label>
+              <select
+                value={attendanceFilter}
+                onChange={handleAttendanceFilter}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
+              >
+                <option value="all">All Users</option>
+                <option value="day1">Day 1 Only</option>
+                <option value="day2">Day 2 Only</option>
+                <option value="both">Both Days</option>
+                <option value="none">No Attendance</option>
+              </select>
+            </div>
+
+            {/* Report Actions */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Reports</label>
+              <div className="flex space-x-2">
+                <button
+                  onClick={generatePDFReport}
+                  className="flex-1 bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-3 rounded-lg transition-colors flex items-center justify-center space-x-1 text-sm"
+                >
+                  <FiDownload className="text-xs" />
+                  <span>PDF</span>
+                </button>
+                <button
+                  onClick={generateScheduleReport}
+                  className="flex-1 bg-purple-600 hover:bg-purple-700 text-white font-semibold py-2 px-3 rounded-lg transition-colors flex items-center justify-center space-x-1 text-sm"
+                >
+                  <FiClock className="text-xs" />
+                  <span>Schedule</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Schedule Filters */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t border-gray-200">
+            {/* Day 1 Schedule Filter */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Day 1 Schedule</label>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  onClick={() => handleScheduleFilter("day1", "all")}
+                  className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                    scheduleFilter.day1 === ""
+                      ? "bg-blue-600 text-white"
+                      : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+                  }`}
+                >
+                  All
+                </button>
+                {Object.entries(day1Schedule).map(([key, schedule]) => (
+                  <button
+                    key={key}
+                    onClick={() => handleScheduleFilter("day1", key)}
+                    className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                      scheduleFilter.day1 === key
+                        ? "bg-blue-600 text-white"
+                        : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+                    }`}
+                  >
+                    {schedule.display.split(' ')[0]}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Day 2 Schedule Filter */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Day 2 Schedule</label>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  onClick={() => handleScheduleFilter("day2", "all")}
+                  className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                    scheduleFilter.day2 === ""
+                      ? "bg-green-600 text-white"
+                      : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+                  }`}
+                >
+                  All
+                </button>
+                {Object.entries(day2Schedule).map(([key, schedule]) => (
+                  <button
+                    key={key}
+                    onClick={() => handleScheduleFilter("day2", key)}
+                    className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                      scheduleFilter.day2 === key
+                        ? "bg-green-600 text-white"
+                        : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+                    }`}
+                  >
+                    {schedule.display.split(' ')[0]}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        </motion.div>
 
         {/* Charts Section */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
@@ -834,35 +1107,59 @@ export default function AdminDashboard() {
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Day 2
                   </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Day 1 Schedule
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Day 2 Schedule
+                  </th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {zoneStats.map((stat, idx) => (
-                  <tr key={idx} className="hover:bg-gray-50 transition-colors">
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                      {stat.zone}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {stat.registered}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-blue-600 font-semibold">
-                      {stat.day1}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-green-600 font-semibold">
-                      {stat.day2}
-                    </td>
-                  </tr>
-                ))}
+                {zoneStats.map((stat, idx) => {
+                  const zoneUsers = registeredUsers.filter(u => u.zone === stat.zone);
+                  const day1Morning = zoneUsers.filter(u => u.day1Schedule === 'morning').length;
+                  const day1Afternoon = zoneUsers.filter(u => u.day1Schedule === 'afternoon').length;
+                  const day1Evening = zoneUsers.filter(u => u.day1Schedule === 'evening').length;
+                  const day2Morning = zoneUsers.filter(u => u.day2Schedule === 'morning').length;
+                  const day2Afternoon = zoneUsers.filter(u => u.day2Schedule === 'afternoon').length;
+                  const day2Evening = zoneUsers.filter(u => u.day2Schedule === 'evening').length;
+                  
+                  return (
+                    <tr key={idx} className="hover:bg-gray-50 transition-colors">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                        {stat.zone}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {stat.registered}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-blue-600 font-semibold">
+                        {stat.day1}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-green-600 font-semibold">
+                        {stat.day2}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                        <div className="text-xs">
+                          <div>M: {day1Morning}</div>
+                          <div>A: {day1Afternoon}</div>
+                          <div>E: {day1Evening}</div>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                        <div className="text-xs">
+                          <div>M: {day2Morning}</div>
+                          <div>A: {day2Afternoon}</div>
+                          <div>E: {day2Evening}</div>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
         </motion.div>
-
-        {/* Report Generation Section (unchanged) */}
-        {/* ... */}
-
-        {/* Filters Section (unchanged) */}
-        {/* ... */}
 
         {/* Edit User Modal - Updated for Schedules */}
         {editingUser && (

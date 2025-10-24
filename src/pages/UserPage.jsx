@@ -22,13 +22,13 @@ export default function AttendancePage() {
     return () => clearInterval(timer);
   }, []);
 
-  // Event Dates
+  // Event Dates - FIXED: Corrected dates
   const eventDates = {
-    day1: new Date('2025-10-24T00:00:00+05:30'), // October 24, 2025 IST
-    day2: new Date('2025-10-25T00:00:00+05:30')  // October 25, 2025 IST
+    day1: new Date('2025-10-25T00:00:00+05:30'), // October 24, 2025 IST
+    day2: new Date('2025-10-26T00:00:00+05:30')  // October 26, 2025 IST
   };
 
-  // Day 1 Schedule - October 24, 2025
+  // Day 1 Schedule - October 25, 2025 
   const day1Schedule = {
     morning: { 
       start: "10:00", 
@@ -40,35 +40,50 @@ export default function AttendancePage() {
       start: "14:30", 
       end: "16:30", 
       display: "Afternoon 2:30 PM",
-      date: "2025-10-26"
+      date: "2025-10-25"
     },
     evening: { 
       start: "18:20", 
       end: "20:20", 
       display: "Evening 6:20 PM",
-      date: "2025-10-24"
+      date: "2025-10-25"
     }
   };
 
-  // Day 2 Schedule - October 25, 2025
+  // Day 2 Schedule - October 26, 2025
   const day2Schedule = {
     morning: { 
       start: "08:30", 
       end: "10:30", 
       display: "Morning 8:30 AM",
-      date: "2025-10-25"
+      date: "2025-10-26"
     },
     afternoon: { 
       start: "14:30", 
       end: "16:30", 
       display: "Afternoon 2:30 PM",
-      date: "2025-10-25"
+      date: "2025-10-26"
     },
     evening: { 
       start: "19:00", 
       end: "21:00", 
       display: "Evening 7:00 PM",
-      date: "2025-10-25"
+      date: "2025-10-26"
+    }
+  };
+
+  // FIXED: Added missing voice function
+  const playWelcomeVoice = (name) => {
+    try {
+      if ('speechSynthesis' in window) {
+        const utterance = new SpeechSynthesisUtterance(`Welcome ${name}! Your attendance has been marked successfully.`);
+        utterance.lang = 'en-IN';
+        utterance.rate = 0.9;
+        utterance.pitch = 1;
+        window.speechSynthesis.speak(utterance);
+      }
+    } catch (error) {
+      console.log("Voice synthesis not supported:", error);
     }
   };
 
@@ -238,25 +253,6 @@ export default function AttendancePage() {
     animate();
   };
 
-  // Voice function
-  const playWelcomeVoice = (name) => {
-    const text = `Welcome Back ${name} to the Ahibba Summit 2025! We are delighted to have you here. Enjoy the event and make the most of this incredible experience!`;
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.lang = 'en-IN';
-    utterance.rate = 0.8;
-    utterance.pitch = 0.8;
-    utterance.volume = 1;
-
-    const voices = window.speechSynthesis.getVoices();
-    const indianVoice = voices.find(v => v.lang.includes('en-IN')) || voices.find(v => v.lang.includes('en'));
-    if (indianVoice) {
-      utterance.voice = indianVoice;
-    }
-
-    window.speechSynthesis.cancel();
-    window.speechSynthesis.speak(utterance);
-  };
-
   const handleSearch = async (e) => {
     e.preventDefault();
 
@@ -294,6 +290,7 @@ export default function AttendancePage() {
     }
   };
 
+  // FIXED: Improved error handling in handleMarkAttendance
   const handleMarkAttendance = async () => {
     if (!day || !schedule) {
       setMessage("Please select both Day and Schedule");
@@ -306,7 +303,13 @@ export default function AttendancePage() {
       return;
     }
 
+    if (!userData || !userData.id) {
+      setMessage("User data not found. Please search again.");
+      return;
+    }
+
     setLoading(true);
+    setMessage(""); // Clear previous messages
 
     try {
       const attendanceField = `day${day}Attendance`;
@@ -315,27 +318,38 @@ export default function AttendancePage() {
       
       const userRef = doc(db, "registration", userData.id);
 
-      await updateDoc(userRef, {
+      // FIXED: Added proper error handling and validation
+      const updateData = {
         [attendanceField]: true,
         [scheduleField]: schedule,
-        [timeField]: new Date()
-      });
+        [timeField]: new Date().toISOString() // Use ISO string for better compatibility
+      };
 
-      // Trigger voice and confetti for Day 1
-      if (day === "1") {
-        playWelcomeVoice(userData.name);
-        createConfetti();
-      }
+      await updateDoc(userRef, updateData);
 
-      setMessage(`Day ${day} - ${getScheduleDisplay(day, schedule)} attendance marked successfully!`);
+      // Update local state
       setUserData(prev => ({
         ...prev,
         [attendanceField]: true,
-        [scheduleField]: schedule
+        [scheduleField]: schedule,
+        [timeField]: new Date().toISOString()
       }));
+
+      // Trigger voice and confetti for Day 1
+      if (day === "1") {
+        try {
+          playWelcomeVoice(userData.name);
+          createConfetti();
+        } catch (error) {
+          console.log("Animation error (non-critical):", error);
+        }
+      }
+
+      setMessage(`Day ${day} - ${getScheduleDisplay(day, schedule)} attendance marked successfully!`);
       setDay("");
       setSchedule("");
       
+      // Reset after success
       setTimeout(() => {
         setMobile("");
         setUserData(null);
@@ -344,7 +358,21 @@ export default function AttendancePage() {
       }, 3000);
     } catch (error) {
       console.error("Error marking attendance:", error);
-      setMessage("Failed to mark attendance. Please try again.");
+      
+      // FIXED: More descriptive error messages
+      let errorMessage = "Failed to mark attendance. ";
+      
+      if (error.code === 'permission-denied') {
+        errorMessage += "Permission denied. Please check database rules.";
+      } else if (error.code === 'not-found') {
+        errorMessage += "User document not found.";
+      } else if (error.code === 'unavailable') {
+        errorMessage += "Network error. Please check your connection.";
+      } else {
+        errorMessage += "Please try again or contact support.";
+      }
+      
+      setMessage(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -567,12 +595,12 @@ export default function AttendancePage() {
                 </div>
                 {!isDay1Marked && !isDayActive("1") && (
                   <p className="text-xs text-amber-600 mt-1">
-                    📅 Day 1 available only on {formatDate(eventDates.day1)}
+                     Day 1 available only on {formatDate(eventDates.day1)}
                   </p>
                 )}
                 {isDay1Marked && !isDayActive("2") && (
                   <p className="text-xs text-amber-600 mt-1">
-                    📅 Day 2 available only on {formatDate(eventDates.day2)}
+                     Day 2 available only on {formatDate(eventDates.day2)}
                   </p>
                 )}
               </div>
