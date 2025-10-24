@@ -24,27 +24,27 @@ export default function AttendancePage() {
 
   // Event Dates - FIXED: Corrected dates
   const eventDates = {
-    day1: new Date('2025-10-25T00:00:00+05:30'), // October 24, 2025 IST
+    day1: new Date('2025-10-25T00:00:00+05:30'), // October 25, 2025 IST
     day2: new Date('2025-10-26T00:00:00+05:30')  // October 26, 2025 IST
   };
 
   // Day 1 Schedule - October 25, 2025 
   const day1Schedule = {
     morning: { 
-      start: "10:00", 
-      end: "12:00", 
+      start: "09:30", 
+      end: "10:15", 
       display: "Morning 10:00 AM",
       date: "2025-10-25"
     },
     afternoon: { 
-      start: "14:30", 
-      end: "16:30", 
+      start: "14:00", 
+      end: "14:45", 
       display: "Afternoon 2:30 PM",
       date: "2025-10-25"
     },
     evening: { 
-      start: "18:20", 
-      end: "20:20", 
+      start: "18:15", 
+      end: "18:40", 
       display: "Evening 6:20 PM",
       date: "2025-10-25"
     }
@@ -53,14 +53,14 @@ export default function AttendancePage() {
   // Day 2 Schedule - October 26, 2025
   const day2Schedule = {
     morning: { 
-      start: "08:30", 
-      end: "10:30", 
+      start: "08:00", 
+      end: "08:45", 
       display: "Morning 8:30 AM",
       date: "2025-10-26"
     },
     afternoon: { 
-      start: "14:30", 
-      end: "16:30", 
+      start: "14:00", 
+      end: "16:45", 
       display: "Afternoon 2:30 PM",
       date: "2025-10-26"
     },
