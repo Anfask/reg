@@ -34,7 +34,7 @@ function App() {
         <Route path="/" element={<LandingPage />} />
         
         {/* Registration page */}
-        <Route path="/QWZlcm5vb25TZWN0aW9uIERheSAx" element={<UserPage />} />
+        <Route path="/RXZlbmluZ1NlY3Rpb25EYXkx" element={<UserPage />} />
         {/* Certificate page */}
         <Route path="/certificate" element={<CertificatePage />} />
         
