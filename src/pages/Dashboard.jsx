@@ -70,7 +70,7 @@ const ZONES = [
 const day1Schedule = {
   morning: { 
     start: "09:30", 
-    end: "10:15", 
+    end: "10:45", 
     display: "Morning 10:00 AM",
     date: "2025-10-25"
   },
