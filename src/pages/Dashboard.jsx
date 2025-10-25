@@ -76,7 +76,7 @@ const day1Schedule = {
   },
   afternoon: { 
     start: "14:30", 
-    end: "14:55", 
+    end: "13:10", 
     display: "Afternoon 2:50 PM",
     date: "2025-10-25"
   },
