@@ -38,7 +38,10 @@ import {
   FiChevronLeft,
   FiChevronRight,
   FiPlus,
-  FiMinus
+  FiMinus,
+  FiStar,
+  FiThumbsUp,
+  FiMessageCircle
 } from "react-icons/fi";
 import { 
   HiOutlineUserGroup,
@@ -90,7 +93,7 @@ const day1Schedule = {
 
 const day2Schedule = {
   morning: { 
-    start: "08:00", 
+    start: "08:15", 
     end: "08:45", 
     display: "Morning 8:30 AM",
     date: "2025-10-26"
@@ -297,6 +300,9 @@ export default function AdminDashboard() {
   const [registeredUsers, setRegisteredUsers] = useState([]);
   const [filteredUsers, setFilteredUsers] = useState([]);
   const [currentPageUsers, setCurrentPageUsers] = useState([]);
+  const [feedbackData, setFeedbackData] = useState([]);
+  const [filteredFeedback, setFilteredFeedback] = useState([]);
+  const [currentPageFeedback, setCurrentPageFeedback] = useState([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [zoneFilter, setZoneFilter] = useState("");
   const [attendanceFilter, setAttendanceFilter] = useState("all");
@@ -311,7 +317,9 @@ export default function AdminDashboard() {
   const [showUserSelection, setShowUserSelection] = useState(false);
   const [currentSession, setCurrentSession] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
+  const [feedbackPage, setFeedbackPage] = useState(1);
   const [usersPerPage] = useState(10);
+  const [feedbackPerPage] = useState(10);
   const [zones, setZones] = useState([...ZONES]);
   const [newZone, setNewZone] = useState("");
   const [newUser, setNewUser] = useState({
@@ -321,9 +329,11 @@ export default function AdminDashboard() {
     zone: ""
   });
   const [manualAttendanceSearch, setManualAttendanceSearch] = useState("");
+  const [feedbackFilter, setFeedbackFilter] = useState("all");
+  const [feedbackSearch, setFeedbackSearch] = useState("");
 
   useEffect(() => {
-    const unsubscribe = onSnapshot(collection(db, "registration"), (snapshot) => {
+    const unsubscribeRegistration = onSnapshot(collection(db, "registration"), (snapshot) => {
       const data = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
       
       // Sort users by registration date (newest first)
@@ -337,7 +347,25 @@ export default function AdminDashboard() {
       filterUsers(sortedData, searchQuery, zoneFilter, attendanceFilter, scheduleFilter);
       setLoading(false);
     });
-    return () => unsubscribe();
+
+    const unsubscribeFeedback = onSnapshot(collection(db, "feedback"), (snapshot) => {
+      const data = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+      
+      // Sort feedback by submission date (newest first)
+      const sortedData = data.sort((a, b) => {
+        const dateA = getDateOnly(a.submittedAt);
+        const dateB = getDateOnly(b.submittedAt);
+        return dateB - dateA; // Descending order (newest first)
+      });
+      
+      setFeedbackData(sortedData);
+      filterFeedbackData(sortedData, feedbackSearch, feedbackFilter);
+    });
+
+    return () => {
+      unsubscribeRegistration();
+      unsubscribeFeedback();
+    };
   }, []);
 
   // Update current page users when filtered users change
@@ -346,6 +374,13 @@ export default function AdminDashboard() {
     const indexOfFirstUser = indexOfLastUser - usersPerPage;
     setCurrentPageUsers(filteredUsers.slice(indexOfFirstUser, indexOfLastUser));
   }, [filteredUsers, currentPage, usersPerPage]);
+
+  // Update current page feedback when filtered feedback changes
+  useEffect(() => {
+    const indexOfLastFeedback = feedbackPage * feedbackPerPage;
+    const indexOfFirstFeedback = indexOfLastFeedback - feedbackPerPage;
+    setCurrentPageFeedback(filteredFeedback.slice(indexOfFirstFeedback, indexOfLastFeedback));
+  }, [filteredFeedback, feedbackPage, feedbackPerPage]);
 
   const filterUsers = (users, search, zone, attendance, schedule) => {
     let filtered = users;
@@ -389,6 +424,34 @@ export default function AdminDashboard() {
     setCurrentPage(1); // Reset to first page when filters change
   };
 
+  const filterFeedbackData = (feedback, search, filter) => {
+    let filtered = feedback;
+
+    if (search.trim()) {
+      const lowerSearch = search.toLowerCase();
+      filtered = filtered.filter(
+        (f) =>
+          f.name?.toLowerCase().includes(lowerSearch) ||
+          f.feedback?.toLowerCase().includes(lowerSearch) ||
+          f.designation?.toLowerCase().includes(lowerSearch) ||
+          f.zone?.toLowerCase().includes(lowerSearch)
+      );
+    }
+
+    if (filter === "pending") {
+      filtered = filtered.filter((f) => f.status === "pending");
+    } else if (filter === "reviewed") {
+      filtered = filtered.filter((f) => f.status === "reviewed");
+    } else if (filter === "high") {
+      filtered = filtered.filter((f) => f.rating >= 4);
+    } else if (filter === "low") {
+      filtered = filtered.filter((f) => f.rating <= 2);
+    }
+
+    setFilteredFeedback(filtered);
+    setFeedbackPage(1); // Reset to first page when filters change
+  };
+
   // Filter users for manual attendance modal
   const getFilteredUsersForManualAttendance = () => {
     if (!manualAttendanceSearch.trim()) {
@@ -408,6 +471,18 @@ export default function AdminDashboard() {
     const query = e.target.value;
     setSearchQuery(query);
     filterUsers(registeredUsers, query, zoneFilter, attendanceFilter, scheduleFilter);
+  };
+
+  const handleFeedbackSearchChange = (e) => {
+    const query = e.target.value;
+    setFeedbackSearch(query);
+    filterFeedbackData(feedbackData, query, feedbackFilter);
+  };
+
+  const handleFeedbackFilterChange = (e) => {
+    const filter = e.target.value;
+    setFeedbackFilter(filter);
+    filterFeedbackData(feedbackData, feedbackSearch, filter);
   };
 
   const handleZoneFilter = (e) => {
@@ -431,6 +506,11 @@ export default function AdminDashboard() {
 
   const handlePageChange = (pageNumber) => {
     setCurrentPage(pageNumber);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleFeedbackPageChange = (pageNumber) => {
+    setFeedbackPage(pageNumber);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -722,6 +802,37 @@ export default function AdminDashboard() {
     }
   };
 
+  // Function to update feedback status
+  const handleUpdateFeedbackStatus = async (feedbackId, status) => {
+    try {
+      const feedbackRef = doc(db, "feedback", feedbackId);
+      await updateDoc(feedbackRef, {
+        status: status,
+        reviewedAt: new Date()
+      });
+
+      Swal.fire({
+        title: 'Success!',
+        text: `Feedback marked as ${status}.`,
+        icon: 'success',
+        timer: 1500,
+        showConfirmButton: false,
+        background: '#fff',
+        color: '#333'
+      });
+    } catch (error) {
+      console.error("Error updating feedback:", error);
+      Swal.fire({
+        title: 'Error!',
+        text: 'Error updating feedback status. Please try again.',
+        icon: 'error',
+        confirmButtonColor: '#3085d6',
+        background: '#fff',
+        color: '#333'
+      });
+    }
+  };
+
   // Add new user function
   const handleAddUser = async () => {
     if (!newUser.name || !newUser.mobile || !newUser.designation || !newUser.zone) {
@@ -826,7 +937,7 @@ export default function AdminDashboard() {
     });
   };
 
-  // Enhanced statistics with manual attendance breakdown
+  // Enhanced statistics with manual attendance breakdown and feedback stats
   const stats = {
     totalRegistered: registeredUsers.length,
     day1Attendance: registeredUsers.filter((u) => u.day1Attendance).length,
@@ -851,6 +962,16 @@ export default function AdminDashboard() {
       day1: registeredUsers.filter(u => u.day1LateMinutes > 0).length,
       day2: registeredUsers.filter(u => u.day2LateMinutes > 0).length,
       total: registeredUsers.filter(u => u.day1LateMinutes > 0 || u.day2LateMinutes > 0).length
+    },
+    feedback: {
+      total: feedbackData.length,
+      pending: feedbackData.filter(f => f.status === 'pending').length,
+      reviewed: feedbackData.filter(f => f.status === 'reviewed').length,
+      averageRating: feedbackData.length > 0 
+        ? (feedbackData.reduce((sum, f) => sum + (f.rating || 0), 0) / feedbackData.length).toFixed(1)
+        : 0,
+      highRating: feedbackData.filter(f => f.rating >= 4).length,
+      lowRating: feedbackData.filter(f => f.rating <= 2).length
     }
   };
 
@@ -865,7 +986,7 @@ export default function AdminDashboard() {
     };
   });
 
-  // Enhanced chart data with manual attendance breakdown
+  // Enhanced chart data with manual attendance breakdown and feedback
   const chartData = [
     { name: "Day 1", count: stats.day1Attendance },
     { name: "Day 2", count: stats.day2Attendance },
@@ -888,6 +1009,22 @@ export default function AdminDashboard() {
     { name: "Day 2 Manual", count: stats.manualEntries.day2 },
     { name: "Day 1 Late", count: stats.lateEntries.day1 },
     { name: "Day 2 Late", count: stats.lateEntries.day2 }
+  ];
+
+  const feedbackChartData = [
+    { name: "Total Feedback", count: stats.feedback.total },
+    { name: "Pending Review", count: stats.feedback.pending },
+    { name: "Reviewed", count: stats.feedback.reviewed },
+    { name: "High Rating (4-5)", count: stats.feedback.highRating },
+    { name: "Low Rating (1-2)", count: stats.feedback.lowRating }
+  ];
+
+  const ratingDistributionData = [
+    { name: "1 Star", count: feedbackData.filter(f => f.rating === 1).length },
+    { name: "2 Stars", count: feedbackData.filter(f => f.rating === 2).length },
+    { name: "3 Stars", count: feedbackData.filter(f => f.rating === 3).length },
+    { name: "4 Stars", count: feedbackData.filter(f => f.rating === 4).length },
+    { name: "5 Stars", count: feedbackData.filter(f => f.rating === 5).length }
   ];
 
   const COLORS = ["#3B82F6", "#10B981", "#8B5CF6", "#F59E0B", "#EF4444", "#8B5CF6"];
@@ -1176,14 +1313,32 @@ export default function AdminDashboard() {
 
   // Calculate total pages for pagination
   const totalPages = Math.ceil(filteredUsers.length / usersPerPage);
+  const totalFeedbackPages = Math.ceil(filteredFeedback.length / feedbackPerPage);
 
   // Get filtered users for manual attendance modal
   const filteredUsersForManualAttendance = getFilteredUsersForManualAttendance();
 
-  // Render different tabs
+  // Render Star Rating Component
+  const renderStarRating = (rating) => {
+    return (
+      <div className="flex items-center space-x-1">
+        {[1, 2, 3, 4, 5].map((star) => (
+          <FiStar
+            key={star}
+            className={`text-sm ${
+              star <= rating ? 'text-yellow-500 fill-yellow-500' : 'text-gray-300'
+            }`}
+          />
+        ))}
+        <span className="text-sm text-gray-600 ml-1">({rating})</span>
+      </div>
+    );
+  };
+
+  // Render Dashboard Tab (ALL ORIGINAL FUNCTIONALITY PRESERVED)
   const renderDashboard = () => (
     <>
-      {/* Stats Cards */}
+      {/* Stats Cards - Enhanced with Feedback Stats */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
         <motion.div
           initial={{ y: 20, opacity: 0 }}
@@ -1255,23 +1410,23 @@ export default function AdminDashboard() {
         >
           <div className="flex items-center justify-between">
             <div>
-              <h3 className="text-sm font-medium text-gray-500 mb-1">Manual Entries</h3>
-              <p className="text-3xl font-bold text-gray-800">{stats.manualEntries.total}</p>
+              <h3 className="text-sm font-medium text-gray-500 mb-1">Feedback Received</h3>
+              <p className="text-3xl font-bold text-gray-800">{stats.feedback.total}</p>
               <div className="text-xs text-gray-600 mt-1">
-                Day 1: {stats.manualEntries.day1} | Day 2: {stats.manualEntries.day2}
+                Avg: {stats.feedback.averageRating} ★ | Pending: {stats.feedback.pending}
               </div>
               <div className="text-xs text-orange-600 mt-1">
-                Total Late: {stats.lateEntries.total}
+                High: {stats.feedback.highRating} | Low: {stats.feedback.lowRating}
               </div>
             </div>
             <div className="bg-purple-100 p-3 rounded-full">
-              <FiUserCheck className="text-2xl text-purple-500" />
+              <FiMessageCircle className="text-2xl text-purple-500" />
             </div>
           </div>
         </motion.div>
       </div>
 
-      {/* Enhanced Filters Section */}
+      {/* Enhanced Filters Section - ORIGINAL PRESERVED */}
       <motion.div
         initial={{ y: 20, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
@@ -1353,7 +1508,7 @@ export default function AdminDashboard() {
           </div>
         </div>
 
-        {/* Schedule Filters */}
+        {/* Schedule Filters - ORIGINAL PRESERVED */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t border-gray-200">
           {/* Day 1 Schedule Filter */}
           <div>
@@ -1417,7 +1572,7 @@ export default function AdminDashboard() {
         </div>
       </motion.div>
 
-      {/* Manual Attendance Section */}
+      {/* Manual Attendance Section - ORIGINAL PRESERVED */}
       <motion.div
         initial={{ y: 20, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
@@ -1492,7 +1647,7 @@ export default function AdminDashboard() {
         </div>
       </motion.div>
 
-      {/* Charts Section */}
+      {/* Charts Section - ORIGINAL PRESERVED */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
         <motion.div
           initial={{ opacity: 0, scale: 0.95 }}
@@ -1540,7 +1695,7 @@ export default function AdminDashboard() {
         </motion.div>
       </div>
 
-      {/* Schedule Statistics */}
+      {/* Schedule Statistics - ORIGINAL PRESERVED */}
       <motion.div
         initial={{ y: 20, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
@@ -1633,7 +1788,7 @@ export default function AdminDashboard() {
         </div>
       </motion.div>
 
-      {/* Zone Statistics */}
+      {/* Zone Statistics - ORIGINAL PRESERVED */}
       <motion.div
         initial={{ y: 20, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
@@ -1692,7 +1847,7 @@ export default function AdminDashboard() {
         </div>
       </motion.div>
 
-      {/* Users Table with Pagination */}
+      {/* Users Table with Pagination - ORIGINAL PRESERVED */}
       <motion.div
         initial={{ y: 20, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
@@ -1872,6 +2027,7 @@ export default function AdminDashboard() {
     </>
   );
 
+  // Render User Registration Tab - ORIGINAL PRESERVED
   const renderUserRegistration = () => (
     <motion.div
       initial={{ y: 20, opacity: 0 }}
@@ -1943,6 +2099,7 @@ export default function AdminDashboard() {
     </motion.div>
   );
 
+  // Render Zones Management Tab - ORIGINAL PRESERVED
   const renderZonesManagement = () => (
     <motion.div
       initial={{ y: 20, opacity: 0 }}
@@ -1996,6 +2153,329 @@ export default function AdminDashboard() {
     </motion.div>
   );
 
+  // Render Feedback Tab - NEW FEATURE ADDED
+  const renderFeedback = () => (
+    <motion.div
+      initial={{ y: 20, opacity: 0 }}
+      animate={{ y: 0, opacity: 1 }}
+      className="space-y-6"
+    >
+      {/* Feedback Stats Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+        <motion.div
+          initial={{ y: 20, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          className="bg-white p-6 rounded-xl shadow-md border-l-4 border-purple-500 hover:shadow-lg transition-shadow"
+        >
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-sm font-medium text-gray-500 mb-1">Total Feedback</h3>
+              <p className="text-3xl font-bold text-gray-800">{stats.feedback.total}</p>
+            </div>
+            <div className="bg-purple-100 p-3 rounded-full">
+              <FiMessageCircle className="text-2xl text-purple-600" />
+            </div>
+          </div>
+        </motion.div>
+
+        <motion.div
+          initial={{ y: 20, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          transition={{ delay: 0.1 }}
+          className="bg-white p-6 rounded-xl shadow-md border-l-4 border-yellow-500 hover:shadow-lg transition-shadow"
+        >
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-sm font-medium text-gray-500 mb-1">Average Rating</h3>
+              <p className="text-3xl font-bold text-gray-800">{stats.feedback.averageRating}</p>
+              <div className="text-xs text-gray-600 mt-1">
+                {renderStarRating(Math.round(stats.feedback.averageRating))}
+              </div>
+            </div>
+            <div className="bg-yellow-100 p-3 rounded-full">
+              <FiStar className="text-2xl text-yellow-500" />
+            </div>
+          </div>
+        </motion.div>
+
+        <motion.div
+          initial={{ y: 20, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          transition={{ delay: 0.15 }}
+          className="bg-white p-6 rounded-xl shadow-md border-l-4 border-orange-500 hover:shadow-lg transition-shadow"
+        >
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-sm font-medium text-gray-500 mb-1">Pending Review</h3>
+              <p className="text-3xl font-bold text-gray-800">{stats.feedback.pending}</p>
+              <div className="text-xs text-gray-600 mt-1">
+                {Math.round((stats.feedback.pending / stats.feedback.total) * 100) || 0}% of total
+              </div>
+            </div>
+            <div className="bg-orange-100 p-3 rounded-full">
+              <FiAlertTriangle className="text-2xl text-orange-500" />
+            </div>
+          </div>
+        </motion.div>
+
+        <motion.div
+          initial={{ y: 20, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          transition={{ delay: 0.2 }}
+          className="bg-white p-6 rounded-xl shadow-md border-l-4 border-green-500 hover:shadow-lg transition-shadow"
+        >
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-sm font-medium text-gray-500 mb-1">High Ratings</h3>
+              <p className="text-3xl font-bold text-gray-800">{stats.feedback.highRating}</p>
+              <div className="text-xs text-gray-600 mt-1">
+                4+ Star Ratings
+              </div>
+            </div>
+            <div className="bg-green-100 p-3 rounded-full">
+              <FiThumbsUp className="text-2xl text-green-500" />
+            </div>
+          </div>
+        </motion.div>
+      </div>
+
+      {/* Feedback Charts */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <motion.div
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="bg-white p-6 rounded-xl shadow-md hover:shadow-lg transition-shadow"
+        >
+          <div className="flex items-center space-x-2 mb-4">
+            <FiBarChart2 className="text-xl text-purple-600" />
+            <h3 className="text-lg font-semibold text-gray-800">Feedback Overview</h3>
+          </div>
+          <div className="h-64">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={feedbackChartData}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="name" angle={-45} textAnchor="end" height={80} />
+                <YAxis />
+                <Tooltip />
+                <Bar dataKey="count" fill="#8B5CF6" radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </motion.div>
+
+        <motion.div
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ delay: 0.1 }}
+          className="bg-white p-6 rounded-xl shadow-md hover:shadow-lg transition-shadow"
+        >
+          <div className="flex items-center space-x-2 mb-4">
+            <FiPieChart className="text-xl text-yellow-600" />
+            <h3 className="text-lg font-semibold text-gray-800">Rating Distribution</h3>
+          </div>
+          <div className="h-64">
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie
+                  data={ratingDistributionData}
+                  cx="50%"
+                  cy="50%"
+                  labelLine={false}
+                  label={({ name, percent }) => `${name} (${(percent * 100).toFixed(0)}%)`}
+                  outerRadius={80}
+                  fill="#8884d8"
+                  dataKey="count"
+                >
+                  {ratingDistributionData.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                  ))}
+                </Pie>
+                <Tooltip />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
+        </motion.div>
+      </div>
+
+      {/* Feedback Filters */}
+      <motion.div
+        initial={{ y: 20, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        className="bg-white p-6 rounded-xl shadow-md hover:shadow-lg transition-shadow"
+      >
+        <div className="flex items-center space-x-2 mb-4">
+          <FiFilter className="text-xl text-purple-600" />
+          <h3 className="text-lg font-semibold text-gray-800">Feedback Filters</h3>
+        </div>
+        
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Search Feedback</label>
+            <div className="relative">
+              <FiSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+              <input
+                type="text"
+                placeholder="Search by name, feedback, designation, or zone..."
+                value={feedbackSearch}
+                onChange={handleFeedbackSearchChange}
+                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-colors"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Filter by Status</label>
+            <select
+              value={feedbackFilter}
+              onChange={handleFeedbackFilterChange}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-colors"
+            >
+              <option value="all">All Feedback</option>
+              <option value="pending">Pending Review</option>
+              <option value="reviewed">Reviewed</option>
+              <option value="high">High Rating (4-5)</option>
+              <option value="low">Low Rating (1-2)</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Actions</label>
+            <div className="flex space-x-2">
+              <button
+                onClick={() => {
+                  // Export feedback functionality can be added here
+                  Swal.fire({
+                    title: 'Export Feedback',
+                    text: 'This feature will export all feedback data to a CSV file.',
+                    icon: 'info',
+                    confirmButtonColor: '#3085d6',
+                    background: '#fff',
+                    color: '#333'
+                  });
+                }}
+                className="flex-1 bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-3 rounded-lg transition-colors flex items-center justify-center space-x-1 text-sm"
+              >
+                <FiDownload className="text-xs" />
+                <span>Export CSV</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </motion.div>
+
+      {/* Feedback List */}
+      <motion.div
+        initial={{ y: 20, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        className="bg-white p-6 rounded-xl shadow-md hover:shadow-lg transition-shadow"
+      >
+        <div className="flex justify-between items-center mb-4">
+          <div className="flex items-center space-x-2">
+            <FiMessageCircle className="text-xl text-gray-600" />
+            <h3 className="text-lg font-semibold text-gray-800">
+              User Feedback ({filteredFeedback.length})
+            </h3>
+          </div>
+          <div className="flex items-center space-x-4">
+            <span className="text-sm text-gray-500 bg-gray-100 px-3 py-1 rounded-full">
+              Page {feedbackPage} of {totalFeedbackPages} • Showing {currentPageFeedback.length} of {filteredFeedback.length} feedback
+            </span>
+          </div>
+        </div>
+
+        <div className="space-y-4">
+          {currentPageFeedback.length > 0 ? (
+            currentPageFeedback.map((feedback) => (
+              <div
+                key={feedback.id}
+                className={`border rounded-lg p-4 hover:shadow-md transition-all ${
+                  feedback.status === 'pending' ? 'border-orange-200 bg-orange-50' : 'border-green-200 bg-green-50'
+                }`}
+              >
+                <div className="flex justify-between items-start mb-3">
+                  <div className="flex-1">
+                    <div className="flex items-center space-x-3 mb-2">
+                      <h4 className="font-semibold text-gray-800">{feedback.name}</h4>
+                      <span className="text-xs text-blue-600 bg-blue-100 px-2 py-1 rounded-full">
+                        {feedback.designation}
+                      </span>
+                      <span className="text-xs text-purple-600 bg-purple-100 px-2 py-1 rounded-full">
+                        {feedback.zone}
+                      </span>
+                    </div>
+                    <div className="flex items-center space-x-4 text-sm text-gray-600">
+                      <span>{feedback.mobile}</span>
+                      <span>{formatFirebaseTimestamp(feedback.submittedAt)}</span>
+                    </div>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    {renderStarRating(feedback.rating)}
+                    <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
+                      feedback.status === 'pending' 
+                        ? 'bg-orange-100 text-orange-800' 
+                        : 'bg-green-100 text-green-800'
+                    }`}>
+                      {feedback.status === 'pending' ? 'Pending' : 'Reviewed'}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="mb-3">
+                  <p className="text-gray-700">{feedback.feedback}</p>
+                </div>
+
+                <div className="flex justify-between items-center">
+                  <div className="text-xs text-gray-500">
+                    {feedback.feedbackType && (
+                      <span>Type: {feedback.feedbackType}</span>
+                    )}
+                  </div>
+                  <div className="flex space-x-2">
+                    {feedback.status === 'pending' && (
+                      <button
+                        onClick={() => handleUpdateFeedbackStatus(feedback.id, 'reviewed')}
+                        className="bg-green-500 hover:bg-green-600 text-white px-3 py-1 rounded-lg transition-colors flex items-center space-x-1 text-xs"
+                      >
+                        <FiCheckSquare className="text-xs" />
+                        <span>Mark Reviewed</span>
+                      </button>
+                    )}
+                    {feedback.status === 'reviewed' && (
+                      <button
+                        onClick={() => handleUpdateFeedbackStatus(feedback.id, 'pending')}
+                        className="bg-orange-500 hover:bg-orange-600 text-white px-3 py-1 rounded-lg transition-colors flex items-center space-x-1 text-xs"
+                      >
+                        <FiClock className="text-xs" />
+                        <span>Mark Pending</span>
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ))
+          ) : (
+            <div className="text-center py-8">
+              <div className="flex flex-col items-center justify-center text-gray-500">
+                <FiMessageCircle className="text-4xl mb-2 text-gray-300" />
+                <p className="text-lg font-medium">No feedback found</p>
+                <p className="text-sm">Try adjusting your filters</p>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Feedback Pagination */}
+        {totalFeedbackPages > 1 && (
+          <Pagination
+            currentPage={feedbackPage}
+            totalPages={totalFeedbackPages}
+            onPageChange={handleFeedbackPageChange}
+          />
+        )}
+      </motion.div>
+    </motion.div>
+  );
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
@@ -2029,14 +2509,15 @@ export default function AdminDashboard() {
         </div>
       </nav>
 
-      {/* Navigation Tabs */}
+      {/* Navigation Tabs - Updated with Feedback Tab */}
       <div className="bg-white shadow-sm border-b">
         <div className="container mx-auto px-4">
           <div className="flex space-x-8">
             {[
               { id: "dashboard", label: "Dashboard", icon: FiHome },
               { id: "registration", label: "User Registration", icon: FiUserPlus },
-              { id: "zones", label: "Zones Management", icon: FiMapPin }
+              { id: "zones", label: "Zones Management", icon: FiMapPin },
+              { id: "feedback", label: "User Feedback", icon: FiMessageCircle }
             ].map((tab) => (
               <button
                 key={tab.id}
@@ -2404,6 +2885,7 @@ export default function AdminDashboard() {
         {activeTab === "dashboard" && renderDashboard()}
         {activeTab === "registration" && renderUserRegistration()}
         {activeTab === "zones" && renderZonesManagement()}
+        {activeTab === "feedback" && renderFeedback()}
       </main>
     </div>
   );

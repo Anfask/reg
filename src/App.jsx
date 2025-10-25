@@ -7,6 +7,7 @@ import UserPage from './pages/UserPage';
 import LandingPage from './pages/LandingPage';
 import NotFoundPage from './pages/NotFoundPage';
 import CertificatePage from './pages/Certificate';
+import FeedbackPage from './pages/FeedbackPage';
 
 function ProtectedRoute({ children }) {
   const [user, setUser] = useState(null);
@@ -34,9 +35,11 @@ function App() {
         <Route path="/" element={<LandingPage />} />
         
         {/* Registration page */}
-        <Route path="/RXZlbmluZ1NlY3Rpb25EYXkx" element={<UserPage />} />
+        <Route path="/TW9ybmluZ1NlY3Rpb25EYXky" element={<UserPage />} />
         {/* Certificate page */}
         <Route path="/certificate" element={<CertificatePage />} />
+        {/* Feedback page */}
+        <Route path="/feedback" element={<FeedbackPage />} />
         
         {/* Admin routes */}
         <Route path="/admin" element={<AdminLogin />} />

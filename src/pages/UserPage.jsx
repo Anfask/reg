@@ -61,7 +61,7 @@ export default function AttendancePage() {
     },
     day2: {
       morning: { 
-        start: "08:00", 
+        start: "08:15", 
         end: "08:45", 
         display: "Morning 8:30 AM",
         date: "2025-10-26",
