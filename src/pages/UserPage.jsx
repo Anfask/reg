@@ -45,7 +45,7 @@ export default function AttendancePage() {
         buffer: 15 // minutes buffer before/after
       },
       afternoon: { 
-        start: "13:15", 
+        start: "14:15", 
         end: "14:45", 
         display: "Afternoon 2:30 PM",
         date: "2025-10-25",
