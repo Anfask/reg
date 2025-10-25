@@ -82,7 +82,7 @@ const day1Schedule = {
   },
   evening: { 
     start: "18:15", 
-    end: "18:45", 
+    end: "18:50", 
     display: "Evening 6:20 PM",
     date: "2025-10-25"
   }
