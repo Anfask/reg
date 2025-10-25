@@ -32,7 +32,7 @@ export default function AttendancePage() {
   const day1Schedule = {
     morning: { 
       start: "09:30", 
-      end: "10:15", 
+      end: "10:25", 
       display: "Morning 10:00 AM",
       date: "2025-10-25"
     },
