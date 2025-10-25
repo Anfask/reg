@@ -12,124 +12,194 @@ export default function AttendancePage() {
   const [day, setDay] = useState("");
   const [schedule, setSchedule] = useState("");
   const [currentTime, setCurrentTime] = useState(new Date());
+  const [autoRefresh, setAutoRefresh] = useState(0);
   const canvasRef = useRef(null);
 
-  // Update current time every minute
+  // Enhanced time update with more frequent checks during active periods
   useEffect(() => {
     const timer = setInterval(() => {
-      setCurrentTime(new Date());
-    }, 60000);
+      const now = new Date();
+      setCurrentTime(now);
+      
+      // Force re-render every 30 seconds to update availability
+      setAutoRefresh(prev => prev + 1);
+    }, 30000); // Check every 30 seconds
+    
     return () => clearInterval(timer);
   }, []);
 
-  // Event Dates - FIXED: Corrected dates
+  // Event Dates
   const eventDates = {
-    day1: new Date('2025-10-25T00:00:00+05:30'), // October 25, 2025 IST
-    day2: new Date('2025-10-26T00:00:00+05:30')  // October 26, 2025 IST
+    day1: new Date('2025-10-25T00:00:00+05:30'),
+    day2: new Date('2025-10-26T00:00:00+05:30')
   };
 
-  // Day 1 Schedule - October 25, 2025 
-  const day1Schedule = {
-    morning: { 
-      start: "09:45", 
-      end: "11:10", 
-      display: "Morning 10:00 AM",
-      date: "2025-10-25"
-    },
-    afternoon: { 
-      start: "14:00", 
-      end: "14:45", 
-      display: "Afternoon 2:30 PM",
-      date: "2025-10-25"
-    },
-    evening: { 
-      start: "18:15", 
-      end: "18:40", 
-      display: "Evening 6:20 PM",
-      date: "2025-10-25"
-    }
-  };
-
-  // Day 2 Schedule - October 26, 2025
-  const day2Schedule = {
-    morning: { 
-      start: "08:00", 
-      end: "08:45", 
-      display: "Morning 8:30 AM",
-      date: "2025-10-26"
-    },
-    afternoon: { 
-      start: "14:00", 
-      end: "16:45", 
-      display: "Afternoon 2:30 PM",
-      date: "2025-10-26"
-    },
-    evening: { 
-      start: "19:00", 
-      end: "21:00", 
-      display: "Evening 7:00 PM",
-      date: "2025-10-26"
-    }
-  };
-
-  // FIXED: Added missing voice function
-  const playWelcomeVoice = (name) => {
-    try {
-      if ('speechSynthesis' in window) {
-        const utterance = new SpeechSynthesisUtterance(`Welcome ${name}! Your attendance has been marked successfully.`);
-        utterance.lang = 'en-IN';
-        utterance.rate = 0.9;
-        utterance.pitch = 1;
-        window.speechSynthesis.speak(utterance);
+  // Enhanced schedule configuration with buffer times
+  const schedules = {
+    day1: {
+      morning: { 
+        start: "09:45", 
+        end: "11:10", 
+        display: "Morning 10:00 AM",
+        date: "2025-10-25",
+        buffer: 15 // minutes buffer before/after
+      },
+      afternoon: { 
+        start: "13:15", 
+        end: "14:45", 
+        display: "Afternoon 2:30 PM",
+        date: "2025-10-25",
+        buffer: 15
+      },
+      evening: { 
+        start: "18:15", 
+        end: "18:45", 
+        display: "Evening 6:20 PM",
+        date: "2025-10-25",
+        buffer: 15
       }
-    } catch (error) {
-      console.log("Voice synthesis not supported:", error);
+    },
+    day2: {
+      morning: { 
+        start: "08:00", 
+        end: "08:45", 
+        display: "Morning 8:30 AM",
+        date: "2025-10-26",
+        buffer: 15
+      },
+      afternoon: { 
+        start: "14:00", 
+        end: "16:45", 
+        display: "Afternoon 2:30 PM",
+        date: "2025-10-26",
+        buffer: 15
+      },
+      evening: { 
+        start: "19:00", 
+        end: "21:00", 
+        display: "Evening 7:00 PM",
+        date: "2025-10-26",
+        buffer: 15
+      }
     }
   };
 
-  // Check if a specific day is active (current date matches event date)
-  const isDayActive = (dayNum) => {
-    const now = currentTime;
-    const eventDate = dayNum === "1" ? eventDates.day1 : eventDates.day2;
-    
-    // Check if it's the same day (ignoring time)
-    return now.toDateString() === eventDate.toDateString();
-  };
-
-  // Check if current time is within a schedule slot on the correct date
-  const isScheduleActive = (dayNum, scheduleType) => {
-    const schedule = dayNum === "1" ? day1Schedule : day2Schedule;
-    const slot = schedule[scheduleType];
-    
-    if (!slot) return false;
+  // Enhanced time checking with buffer support
+  const getScheduleWithBuffer = (dayNum, scheduleType) => {
+    const schedule = schedules[`day${dayNum}`]?.[scheduleType];
+    if (!schedule) return null;
 
     const now = currentTime;
-    const eventDate = dayNum === "1" ? eventDates.day1 : eventDates.day2;
+    const eventDate = eventDates[`day${dayNum}`];
     
     // Check if it's the correct event date
     if (now.toDateString() !== eventDate.toDateString()) {
-      return false;
+      return null;
     }
 
-    // Create datetime objects for the schedule slot
-    const startTime = new Date(`${slot.date}T${slot.start}:00+05:30`);
-    const endTime = new Date(`${slot.date}T${slot.end}:00+05:30`);
+    // Create datetime objects with buffer
+    const startTime = new Date(`${schedule.date}T${schedule.start}:00+05:30`);
+    const endTime = new Date(`${schedule.date}T${schedule.end}:00+05:30`);
     
-    return now >= startTime && now <= endTime;
+    const bufferMs = schedule.buffer * 60 * 1000;
+    const startTimeWithBuffer = new Date(startTime.getTime() - bufferMs);
+    const endTimeWithBuffer = new Date(endTime.getTime() + bufferMs);
+
+    return {
+      ...schedule,
+      startTime,
+      endTime,
+      startTimeWithBuffer,
+      endTimeWithBuffer,
+      isActive: now >= startTime && now <= endTime,
+      isInBuffer: (now >= startTimeWithBuffer && now < startTime) || 
+                  (now > endTime && now <= endTimeWithBuffer)
+    };
   };
 
-  // Check if schedule is locked (attendance already marked for this schedule)
+  // Enhanced schedule availability check
+  const isScheduleActive = (dayNum, scheduleType) => {
+    const schedule = getScheduleWithBuffer(dayNum, scheduleType);
+    return schedule ? schedule.isActive : false;
+  };
+
+  // Get current active schedules automatically
+  const getCurrentActiveSchedules = () => {
+    const activeSchedules = [];
+    
+    // Check both days
+    ['1', '2'].forEach(dayNum => {
+      if (!isDayActive(dayNum)) return;
+      
+      const daySchedules = schedules[`day${dayNum}`];
+      Object.keys(daySchedules).forEach(scheduleType => {
+        const schedule = getScheduleWithBuffer(dayNum, scheduleType);
+        if (schedule && schedule.isActive) {
+          activeSchedules.push({
+            day: dayNum,
+            schedule: scheduleType,
+            display: schedule.display,
+            endsAt: schedule.endTime
+          });
+        }
+      });
+    });
+    
+    return activeSchedules;
+  };
+
+  // Auto-select available day and schedule when user is found
+  useEffect(() => {
+    if (userData && !day && !schedule) {
+      const activeSchedules = getCurrentActiveSchedules();
+      
+      // Filter out schedules user has already marked
+      const availableSchedules = activeSchedules.filter(({ day, schedule }) => {
+        const attendanceField = `day${day}Attendance`;
+        const scheduleField = `day${day}Schedule`;
+        return !userData[attendanceField] || userData[scheduleField] !== schedule;
+      });
+
+      if (availableSchedules.length > 0) {
+        const firstAvailable = availableSchedules[0];
+        setDay(firstAvailable.day);
+        setSchedule(firstAvailable.schedule);
+        
+        // Show auto-selection message
+        setMessage(`Auto-selected: Day ${firstAvailable.day} - ${firstAvailable.display}`);
+        
+        // Auto-mark attendance after 2 seconds if only one option
+        if (availableSchedules.length === 1) {
+          const autoMarkTimer = setTimeout(() => {
+            if (!loading) {
+              handleMarkAttendance();
+            }
+          }, 2000);
+          
+          return () => clearTimeout(autoMarkTimer);
+        }
+      }
+    }
+  }, [userData, day, schedule, currentTime, autoRefresh]);
+
+  // Check if a specific day is active
+  const isDayActive = (dayNum) => {
+    const now = currentTime;
+    const eventDate = eventDates[`day${dayNum}`];
+    return now.toDateString() === eventDate.toDateString();
+  };
+
+  // Check if schedule is locked
   const isScheduleLocked = (dayNum, scheduleType) => {
     if (!userData) return true;
     
     const attendanceField = `day${dayNum}Attendance`;
     const scheduleField = `day${dayNum}Schedule`;
     
-    // Check if user has already marked attendance for this schedule
     return userData[attendanceField] && userData[scheduleField] === scheduleType;
   };
 
-  // Check if day is completely locked (all schedules marked or day not active)
+  // Check if day is completely locked
   const isDayLocked = (dayNum) => {
     if (!userData) return true;
     
@@ -142,53 +212,47 @@ export default function AttendancePage() {
     return !isDayActive(dayNum);
   };
 
-  // Get available schedules for a day
+  // Enhanced getAvailableSchedules with real-time status
   const getAvailableSchedules = (dayNum) => {
-    const schedule = dayNum === "1" ? day1Schedule : day2Schedule;
+    const daySchedules = schedules[`day${dayNum}`];
     const available = [];
 
-    Object.keys(schedule).forEach(scheduleType => {
-      if (isScheduleActive(dayNum, scheduleType) && !isScheduleLocked(dayNum, scheduleType)) {
-        available.push({
-          type: scheduleType,
-          display: schedule[scheduleType].display
-        });
-      }
+    Object.keys(daySchedules).forEach(scheduleType => {
+      const schedule = getScheduleWithBuffer(dayNum, scheduleType);
+      if (!schedule) return;
+
+      const isLocked = isScheduleLocked(dayNum, scheduleType);
+      
+      available.push({
+        type: scheduleType,
+        display: schedule.display,
+        isActive: schedule.isActive,
+        isInBuffer: schedule.isInBuffer,
+        isLocked,
+        startTime: schedule.startTime,
+        endTime: schedule.endTime,
+        status: getScheduleStatus(dayNum, scheduleType)
+      });
     });
 
     return available;
   };
 
-  // Get schedule status message
+  // Enhanced schedule status
   const getScheduleStatus = (dayNum, scheduleType) => {
-    const schedule = dayNum === "1" ? day1Schedule : day2Schedule;
-    const slot = schedule[scheduleType];
-    
-    if (!slot) return "Invalid schedule";
+    const schedule = getScheduleWithBuffer(dayNum, scheduleType);
+    if (!schedule) return "Not today";
 
     const now = currentTime;
-    const eventDate = dayNum === "1" ? eventDates.day1 : eventDates.day2;
-    const slotDate = new Date(slot.date + 'T00:00:00+05:30');
-    
-    // Check if it's before the event date
-    if (now < slotDate) {
-      return `Starts on ${formatDate(slotDate)}`;
-    }
-    
-    // Check if it's the correct event date
-    if (now.toDateString() !== eventDate.toDateString()) {
-      return "Not today";
-    }
 
-    const startTime = new Date(`${slot.date}T${slot.start}:00+05:30`);
-    const endTime = new Date(`${slot.date}T${slot.end}:00+05:30`);
-    
-    if (now < startTime) {
-      return `Starts at ${slot.start}`;
-    } else if (now > endTime) {
-      return "Ended";
-    } else {
+    if (schedule.isActive) {
       return "Active Now";
+    } else if (schedule.isInBuffer) {
+      return now < schedule.startTime ? "Starting Soon" : "Just Ended";
+    } else if (now < schedule.startTimeWithBuffer) {
+      return `Starts at ${schedule.start}`;
+    } else {
+      return "Ended";
     }
   };
 
@@ -199,6 +263,21 @@ export default function AttendancePage() {
       month: 'long',
       year: 'numeric'
     });
+  };
+
+  // Voice function
+  const playWelcomeVoice = (name) => {
+    try {
+      if ('speechSynthesis' in window) {
+        const utterance = new SpeechSynthesisUtterance(`Welcome ${name}! Your attendance has been marked successfully.`);
+        utterance.lang = 'en-IN';
+        utterance.rate = 0.9;
+        utterance.pitch = 1;
+        window.speechSynthesis.speak(utterance);
+      }
+    } catch (error) {
+      console.log("Voice synthesis not supported:", error);
+    }
   };
 
   // Confetti animation function
@@ -290,7 +369,6 @@ export default function AttendancePage() {
     }
   };
 
-  // FIXED: Improved error handling in handleMarkAttendance
   const handleMarkAttendance = async () => {
     if (!day || !schedule) {
       setMessage("Please select both Day and Schedule");
@@ -309,7 +387,7 @@ export default function AttendancePage() {
     }
 
     setLoading(true);
-    setMessage(""); // Clear previous messages
+    setMessage("");
 
     try {
       const attendanceField = `day${day}Attendance`;
@@ -318,11 +396,10 @@ export default function AttendancePage() {
       
       const userRef = doc(db, "registration", userData.id);
 
-      // FIXED: Added proper error handling and validation
       const updateData = {
         [attendanceField]: true,
         [scheduleField]: schedule,
-        [timeField]: new Date().toISOString() // Use ISO string for better compatibility
+        [timeField]: new Date().toISOString()
       };
 
       await updateDoc(userRef, updateData);
@@ -359,7 +436,6 @@ export default function AttendancePage() {
     } catch (error) {
       console.error("Error marking attendance:", error);
       
-      // FIXED: More descriptive error messages
       let errorMessage = "Failed to mark attendance. ";
       
       if (error.code === 'permission-denied') {
@@ -379,8 +455,8 @@ export default function AttendancePage() {
   };
 
   const getScheduleDisplay = (dayNum, scheduleType) => {
-    const schedule = dayNum === "1" ? day1Schedule : day2Schedule;
-    return schedule[scheduleType]?.display || scheduleType;
+    const scheduleData = schedules[`day${dayNum}`];
+    return scheduleData[scheduleType]?.display || scheduleType;
   };
 
   const isDay1Marked = userData?.day1Attendance;
@@ -389,8 +465,91 @@ export default function AttendancePage() {
   // Day 2 can only be selected if Day 1 is marked AND it's Day 2 event date
   const canSelectDay2 = isDay1Marked && isDayActive("2");
 
-  // Get available schedules for selected day
-  const availableSchedules = day ? getAvailableSchedules(day) : [];
+  // Enhanced schedule display in the UI
+  const renderScheduleOptions = (dayNum) => {
+    const availableSchedules = getAvailableSchedules(dayNum);
+    
+    if (availableSchedules.length === 0) {
+      return (
+        <div className="text-center p-4 bg-gray-100 rounded-lg">
+          <p className="text-gray-600 text-sm">
+            No active schedules available at this time
+          </p>
+          <p className="text-xs text-gray-500 mt-1">
+            Check the schedule timings and try again during active slots
+          </p>
+        </div>
+      );
+    }
+
+    return availableSchedules.map((slot) => (
+      <button
+        key={slot.type}
+        onClick={() => setSchedule(slot.type)}
+        className={`w-full py-3 px-4 rounded-lg font-semibold transition-all text-left ${
+          schedule === slot.type
+            ? "bg-blue-600 text-white shadow-lg scale-105"
+            : slot.isActive && !slot.isLocked
+            ? "bg-green-100 text-green-700 hover:bg-green-200 border-2 border-green-400"
+            : slot.isLocked
+            ? "bg-blue-100 text-blue-600 border border-blue-300 cursor-not-allowed"
+            : "bg-gray-100 text-gray-500 border border-gray-300 cursor-not-allowed"
+        }`}
+        disabled={!slot.isActive || slot.isLocked}
+      >
+        <div className="flex items-center justify-between">
+          <span>{slot.display}</span>
+          <span className={`text-xs px-2 py-1 rounded ${
+            slot.isActive && !slot.isLocked
+              ? "bg-green-500 text-white animate-pulse"
+              : slot.isLocked
+              ? "bg-blue-500 text-white"
+              : slot.isInBuffer
+              ? "bg-yellow-500 text-white"
+              : "bg-gray-400 text-white"
+          }`}>
+            {slot.status}
+          </span>
+        </div>
+        {slot.isActive && !slot.isLocked && (
+          <div className="text-xs mt-1 text-green-600 font-medium">
+            ✓ Available - Auto-unlocked
+          </div>
+        )}
+        {slot.isLocked && (
+          <div className="text-xs mt-1 text-blue-600">
+            ✓ Attendance already marked
+          </div>
+        )}
+      </button>
+    ));
+  };
+
+  // Add this to show current active sessions
+  const CurrentActiveSessions = () => {
+    const activeSessions = getCurrentActiveSchedules();
+    
+    if (activeSessions.length === 0) return null;
+
+    return (
+      <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg">
+        <h4 className="font-semibold text-green-800 mb-2 flex items-center">
+          <svg className="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
+            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clipRule="evenodd" />
+          </svg>
+          Currently Active Sessions
+        </h4>
+        {activeSessions.map((session, index) => (
+          <div key={index} className="text-sm text-green-700">
+            • Day {session.day} - {session.display} 
+            <span className="text-xs ml-2 bg-green-200 px-2 py-1 rounded">
+              Ends: {session.endsAt.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
+            </span>
+          </div>
+        ))}
+      </div>
+    );
+  };
 
   return (
     <div 
@@ -426,6 +585,9 @@ export default function AttendancePage() {
           transition={{ delay: 0.2, duration: 0.5 }}
           className="bg-transparent p-8 rounded-2xl shadow-2xl w-full max-w-md"
         >
+          {/* Add Current Active Sessions */}
+          <CurrentActiveSessions />
+
           <div className="text-center mb-8">
             <h3 className="text-2xl font-bold text-yellow-500">Mark Attendance</h3>
             <p className="text-white-600 mt-2 text-sm">Enter your mobile number to check in</p>
@@ -437,7 +599,7 @@ export default function AttendancePage() {
 
           {message && (
             <div className={`mb-4 p-3 rounded-lg text-sm font-medium ${
-              (message.includes("successfully") || message.includes("marked")) 
+              (message.includes("successfully") || message.includes("marked") || message.includes("Auto-selected")) 
                 ? "bg-green-100 text-green-700 border border-green-300"
                 : "bg-red-100 text-red-700 border border-red-300"
             }`}>
@@ -465,7 +627,7 @@ export default function AttendancePage() {
               <button
                 onClick={handleSearch}
                 disabled={loading}
-                className="w-full px-6 py-3 bg-yellow-500 hover:from-blue-700 hover:to-blue-800 disabled:from-gray-400 disabled:to-gray-500 text-white font-semibold rounded-lg shadow-md transition-all transform hover:scale-105 disabled:transform-none flex items-center justify-center mt-6"
+                className="w-full px-6 py-3 bg-yellow-500 hover:bg-yellow-600 disabled:bg-gray-400 text-white font-semibold rounded-lg shadow-md transition-all transform hover:scale-105 disabled:transform-none flex items-center justify-center mt-6"
               >
                 {loading ? (
                   <>
@@ -611,35 +773,7 @@ export default function AttendancePage() {
                     Select Schedule <span className="text-red-500">*</span>
                   </label>
                   <div className="space-y-2">
-                    {availableSchedules.length > 0 ? (
-                      availableSchedules.map((slot) => (
-                        <button
-                          key={slot.type}
-                          onClick={() => setSchedule(slot.type)}
-                          className={`w-full py-3 px-4 rounded-lg font-semibold transition-all ${
-                            schedule === slot.type
-                              ? "bg-blue-600 text-white shadow-lg scale-105"
-                              : "bg-green-100 text-green-700 hover:bg-green-200 border border-green-300"
-                          }`}
-                        >
-                          <div className="flex items-center justify-between">
-                            <span>{slot.display}</span>
-                            <span className="text-xs bg-green-500 text-white px-2 py-1 rounded">Active Now</span>
-                          </div>
-                        </button>
-                      ))
-                    ) : (
-                      <div className="text-center p-4 bg-gray-100 rounded-lg">
-                        <p className="text-gray-600 text-sm">
-                          {getAvailableSchedules(day).length === 0 
-                            ? "No active schedules available at this time"
-                            : "You have already marked attendance for all available schedules"}
-                        </p>
-                        <p className="text-xs text-gray-500 mt-1">
-                          Check the schedule timings and try again during active slots
-                        </p>
-                      </div>
-                    )}
+                    {renderScheduleOptions(day)}
                   </div>
                   
                   {/* Schedule Display */}
@@ -648,11 +782,11 @@ export default function AttendancePage() {
                       {day === "1" ? `Day 1 Schedule - ${formatDate(eventDates.day1)}` : `Day 2 Schedule - ${formatDate(eventDates.day2)}`}
                     </h4>
                     <div className="space-y-2 text-xs text-gray-600">
-                      {Object.entries(day === "1" ? day1Schedule : day2Schedule).map(([scheduleType, slot]) => (
+                      {Object.entries(schedules[`day${day}`]).map(([scheduleType, slot]) => (
                         <div key={scheduleType} className="flex justify-between items-center p-2 bg-white rounded border">
                           <span>{slot.display}</span>
                           <span className={`text-xs font-medium px-2 py-1 rounded ${
-                            isScheduleActive(day, scheduleType) 
+                            isScheduleActive(day, scheduleType) && !isScheduleLocked(day, scheduleType)
                               ? "bg-green-100 text-green-700 border border-green-300"
                               : isScheduleLocked(day, scheduleType)
                               ? "bg-blue-100 text-blue-700 border border-blue-300"
