@@ -35,7 +35,7 @@ function App() {
         <Route path="/" element={<LandingPage />} />
         
         {/* Registration page */}
-        <Route path="/TW9ybmluZ1NlY3Rpb25EYXky" element={<UserPage />} />
+        <Route path="/QWZlcm5vb25TZWN0aW9uIERheaAy" element={<UserPage />} />
         {/* Certificate page */}
         <Route path="/certificate" element={<CertificatePage />} />
         {/* Feedback page */}

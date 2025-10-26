@@ -99,7 +99,7 @@ const day2Schedule = {
     date: "2025-10-26"
   },
   afternoon: { 
-    start: "14:00", 
+    start: "14:15", 
     end: "16:45", 
     display: "Afternoon 2:30 PM",
     date: "2025-10-26"
